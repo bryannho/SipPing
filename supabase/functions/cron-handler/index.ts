@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // Create the ping
-        const { error: pingError } = await supabase
+        const { data: newPing, error: pingError } = await supabase
           .from("drink_pings")
           .insert({
             trip_id: rule.trip_id,
@@ -76,7 +76,9 @@ Deno.serve(async (req: Request) => {
             type: rule.type,
             status: "pending",
             scheduled_at: now.toISOString(),
-          });
+          })
+          .select("id")
+          .single();
 
         if (pingError) {
           results.errors.push(`Rule ${rule.id}: ${pingError.message}`);
@@ -94,7 +96,9 @@ Deno.serve(async (req: Request) => {
           supabase,
           rule.to_user_id,
           rule.type,
-          rule.from_user_id
+          rule.from_user_id,
+          false,
+          newPing.id
         );
 
         results.scheduled++;
@@ -149,7 +153,9 @@ Deno.serve(async (req: Request) => {
             supabase,
             ping.to_user_id,
             ping.type,
-            ping.from_user_id
+            ping.from_user_id,
+            false,
+            ping.id
           );
         }
         results.snoozed++;
@@ -179,7 +185,8 @@ async function sendPushNotification(
   recipientUserId: string,
   drinkType: string,
   otherUserId: string,
-  isDeclineNotification = false
+  isDeclineNotification = false,
+  pingId: string | null = null
 ) {
   // Get recipient's push token
   const { data: recipient } = await supabase
@@ -217,7 +224,7 @@ async function sendPushNotification(
     sound: "default",
     title,
     body,
-    data: { type: "drink_ping", drinkType },
+    data: { type: "drink_ping", drinkType, pingId },
     categoryId: "drink_ping", // iOS notification category for action buttons
   };
 

@@ -3,8 +3,8 @@
 -- Creates all 6 core tables, enums, indexes, and triggers
 -- =============================================================
 
--- Extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Extensions (pgcrypto provides gen_random_uuid on Supabase)
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- =============================================================
 -- Custom Types
@@ -30,7 +30,7 @@ CREATE TABLE public.users (
 -- 2. TRIPS
 -- =============================================================
 CREATE TABLE public.trips (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name        TEXT NOT NULL,
   start_date  DATE NOT NULL,
   end_date    DATE,
@@ -60,7 +60,7 @@ CREATE INDEX idx_trip_members_user_id ON public.trip_members(user_id);
 -- 4. DRINK_PINGS
 -- =============================================================
 CREATE TABLE public.drink_pings (
-  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id        UUID NOT NULL REFERENCES public.trips(id) ON DELETE CASCADE,
   from_user_id   UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   to_user_id     UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -84,7 +84,7 @@ CREATE INDEX idx_drink_pings_snoozed ON public.drink_pings(status, snoozed_until
 -- 5. SCHEDULED_RULES
 -- =============================================================
 CREATE TABLE public.scheduled_rules (
-  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id          UUID NOT NULL REFERENCES public.trips(id) ON DELETE CASCADE,
   from_user_id     UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   to_user_id       UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
@@ -105,7 +105,7 @@ CREATE INDEX idx_scheduled_rules_active ON public.scheduled_rules(active, trip_i
 -- 6. DRINK_LOG
 -- =============================================================
 CREATE TABLE public.drink_log (
-  id        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id   UUID NOT NULL REFERENCES public.trips(id) ON DELETE CASCADE,
   user_id   UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   type      drink_type NOT NULL,

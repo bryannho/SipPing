@@ -3,13 +3,17 @@ import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 import { NetworkProvider } from './src/contexts/NetworkContext';
 import { AuthProvider, AuthContext } from './src/contexts/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { navigationRef } from './src/navigation/navigationRef';
 import { linking } from './src/navigation/linking';
 import {
   registerPushToken,
   setupNotificationListeners,
+  setupNotificationCategories,
+  handleNotificationAction,
 } from './src/utils/pushNotifications';
 
 function AppContent() {
@@ -18,6 +22,31 @@ function AppContent() {
 
   useEffect(() => {
     setupNotificationListeners();
+    setupNotificationCategories();
+  }, []);
+
+  // Handle notification tap / action button responses
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const { actionIdentifier } = response;
+        const data = response.notification.request.content.data;
+
+        if (
+          actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER
+        ) {
+          // Default tap — navigate to Pending tab
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('PendingTab');
+          }
+        } else {
+          // Action button pressed (ACCEPT, DECLINE, LATER)
+          handleNotificationAction(actionIdentifier, data);
+        }
+      }
+    );
+
+    return () => subscription.remove();
   }, []);
 
   // Re-register push token when app comes to foreground
@@ -49,7 +78,7 @@ export default function App() {
     <SafeAreaProvider>
       <NetworkProvider>
         <AuthProvider>
-          <NavigationContainer linking={linking}>
+          <NavigationContainer ref={navigationRef} linking={linking}>
             <AppContent />
           </NavigationContainer>
         </AuthProvider>
