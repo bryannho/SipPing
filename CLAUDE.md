@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+Link to Notion doc (full project spec): https://www.notion.so/SipPing-324ecbbd9fbd811997d4ed597ceb03dc
+
 ## Project Overview
 
 SipPing is a React Native (Expo) mobile app backed by Supabase. Users pair up on trips and send each other drink pings (water or shots). The recipient gets a push notification and can accept, decline, or snooze. Everything is tracked per trip.

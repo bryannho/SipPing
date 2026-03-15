@@ -1,20 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { pickAndUploadAvatar } from '../utils/imageUpload';
+import { useFocusEffect } from '@react-navigation/native';
 
 export function AccountScreen({ navigation }) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateProfile } = useAuth();
   const [deleting, setDeleting] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
+
+  // Fetch profile from public.users on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      async function fetchProfile() {
+        const { data } = await supabase
+          .from('users')
+          .select('name, avatar_url')
+          .eq('id', user.id)
+          .single();
+        if (data) {
+          setProfile(data);
+          setNewName(data.name);
+        }
+      }
+      fetchProfile();
+    }, [user.id])
+  );
+
+  const handleChangeAvatar = async () => {
+    setSavingAvatar(true);
+    const publicUrl = await pickAndUploadAvatar(user.id);
+    if (publicUrl) {
+      setProfile((prev) => ({ ...prev, avatar_url: publicUrl }));
+      // Sync auth metadata
+      await updateProfile({ avatar_url: publicUrl });
+    }
+    setSavingAvatar(false);
+  };
+
+  const handleSaveName = async () => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      Alert.alert('Error', 'Display name cannot be empty.');
+      return;
+    }
+    setSavingName(true);
+    const { error } = await updateProfile({ name: trimmed });
+    setSavingName(false);
+    if (error) {
+      Alert.alert('Error', 'Could not update name. Please try again.');
+    } else {
+      setProfile((prev) => ({ ...prev, name: trimmed }));
+      setEditingName(false);
+    }
+  };
 
   const handleDeleteAccount = () => {
     Alert.alert(
@@ -58,6 +113,16 @@ export function AccountScreen({ navigation }) {
       if (photos?.length > 0) {
         const filePaths = photos.map((f) => `${user.id}/${f.name}`);
         await supabase.storage.from('drink-photos').remove(filePaths);
+      }
+
+      // Delete avatar from storage
+      const { data: avatarFiles } = await supabase.storage
+        .from('avatars')
+        .list(user.id);
+
+      if (avatarFiles?.length > 0) {
+        const avatarPaths = avatarFiles.map((f) => `${user.id}/${f.name}`);
+        await supabase.storage.from('avatars').remove(avatarPaths);
       }
 
       // Delete user's drink log entries
@@ -105,19 +170,75 @@ export function AccountScreen({ navigation }) {
     }
   };
 
+  const userName = profile?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || '';
   const userEmail = user?.email || '';
-  const userName = user?.user_metadata?.name || userEmail.split('@')[0] || '';
+  const avatarUrl = profile?.avatar_url || null;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Profile section */}
       <View style={styles.profileSection}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {(userName || userEmail || '?')[0].toUpperCase()}
-          </Text>
-        </View>
-        <Text style={styles.userName}>{userName}</Text>
+        <TouchableOpacity onPress={handleChangeAvatar} disabled={savingAvatar}>
+          <View style={styles.avatarContainer}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {(userName || userEmail || '?')[0].toUpperCase()}
+                </Text>
+              </View>
+            )}
+            {savingAvatar ? (
+              <View style={styles.avatarOverlay}>
+                <ActivityIndicator size="small" color="#fff" />
+              </View>
+            ) : (
+              <View style={styles.cameraIcon}>
+                <Ionicons name="camera" size={14} color="#fff" />
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+
+        {editingName ? (
+          <View style={styles.nameEditRow}>
+            <TextInput
+              style={styles.nameInput}
+              value={newName}
+              onChangeText={setNewName}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleSaveName}
+            />
+            <TouchableOpacity onPress={handleSaveName} disabled={savingName}>
+              {savingName ? (
+                <ActivityIndicator size="small" color="#4A90D9" />
+              ) : (
+                <Ionicons name="checkmark-circle" size={28} color="#4A90D9" />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setNewName(userName);
+                setEditingName(false);
+              }}
+            >
+              <Ionicons name="close-circle" size={28} color="#ccc" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.nameRow}
+            onPress={() => {
+              setNewName(userName);
+              setEditingName(true);
+            }}
+          >
+            <Text style={styles.userName}>{userName}</Text>
+            <Ionicons name="pencil" size={16} color="#aaa" style={{ marginLeft: 6 }} />
+          </TouchableOpacity>
+        )}
         <Text style={styles.userEmail}>{userEmail}</Text>
       </View>
 
@@ -171,6 +292,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
     marginBottom: 24,
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
   avatar: {
     width: 80,
     height: 80,
@@ -178,22 +303,66 @@ const styles = StyleSheet.create({
     backgroundColor: '#4A90D9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   avatarText: {
     color: '#fff',
     fontSize: 32,
     fontWeight: '700',
   },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraIcon: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#4A90D9',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  nameEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  nameInput: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    borderBottomWidth: 2,
+    borderBottomColor: '#4A90D9',
+    paddingVertical: 4,
+    minWidth: 120,
+    textAlign: 'center',
+  },
   userName: {
     fontSize: 22,
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 4,
   },
   userEmail: {
     fontSize: 15,
     color: '#888',
+    marginTop: 4,
   },
   section: {
     marginBottom: 32,

@@ -3,7 +3,8 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
 
-const MAX_WIDTH = 800;
+const DRINK_MAX_WIDTH = 800;
+const AVATAR_MAX_WIDTH = 400;
 const JPEG_QUALITY = 0.7;
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
@@ -63,7 +64,7 @@ export async function pickAndUploadDrinkPhoto(userId, tripId, pingId) {
     // Compress image
     const compressed = await ImageManipulator.manipulateAsync(
       asset.uri,
-      [{ resize: { width: MAX_WIDTH } }],
+      [{ resize: { width: DRINK_MAX_WIDTH } }],
       { compress: JPEG_QUALITY, format: ImageManipulator.SaveFormat.JPEG }
     );
 
@@ -101,6 +102,116 @@ export async function pickAndUploadDrinkPhoto(userId, tripId, pingId) {
     return fileName;
   } catch (e) {
     console.warn('Image processing error:', e);
+    return null;
+  }
+}
+
+/**
+ * Pick and upload a profile avatar photo.
+ * Returns the public URL of the uploaded avatar, or null if cancelled/failed.
+ */
+export async function pickAndUploadAvatar(userId) {
+  const choice = await new Promise((resolve) => {
+    Alert.alert(
+      'Profile Photo',
+      'Update your profile picture',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+        { text: 'Take Photo', onPress: () => resolve('camera') },
+        { text: 'Choose from Library', onPress: () => resolve('library') },
+      ],
+      { cancelable: true, onDismiss: () => resolve(null) }
+    );
+  });
+
+  if (!choice) return null;
+
+  let result;
+
+  if (choice === 'camera') {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Camera access is required to take photos.');
+      return null;
+    }
+    result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+  } else {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Photo library access is required.');
+      return null;
+    }
+    result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+  }
+
+  if (result.canceled || !result.assets?.[0]) return null;
+
+  const asset = result.assets[0];
+
+  try {
+    // Compress image (smaller for avatars)
+    const compressed = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [{ resize: { width: AVATAR_MAX_WIDTH } }],
+      { compress: JPEG_QUALITY, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
+    // Read the file as ArrayBuffer
+    const arrayBuffer = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', compressed.uri, true);
+      xhr.responseType = 'arraybuffer';
+      xhr.onload = () => resolve(xhr.response);
+      xhr.onerror = () => reject(new Error('Failed to read file'));
+      xhr.send();
+    });
+
+    if (arrayBuffer.byteLength > MAX_FILE_SIZE) {
+      Alert.alert('File too large', 'Please choose a smaller photo (max 2MB).');
+      return null;
+    }
+
+    // Upload to avatars bucket (upsert to overwrite previous)
+    const fileName = `${userId}/avatar_${Date.now()}.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, arrayBuffer, {
+        contentType: 'image/jpeg',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.warn('Avatar upload error:', uploadError);
+      Alert.alert('Upload failed', 'Could not upload photo. Please try again.');
+      return null;
+    }
+
+    // Get the public URL
+    const { data: urlData } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName);
+
+    const publicUrl = urlData?.publicUrl;
+
+    // Update the users table with the new avatar URL
+    await supabase
+      .from('users')
+      .update({ avatar_url: publicUrl })
+      .eq('id', userId);
+
+    return publicUrl;
+  } catch (e) {
+    console.warn('Avatar processing error:', e);
     return null;
   }
 }
