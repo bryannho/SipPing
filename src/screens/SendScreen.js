@@ -14,6 +14,13 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { sendDrinkPingNotification } from '../utils/pushNotifications';
 
+const SCHEDULE_OPTIONS = [
+  { label: 'Now', value: 0 },
+  { label: '30m', value: 30 },
+  { label: '1h', value: 60 },
+  { label: '2h', value: 120 },
+];
+
 export function SendScreen({ route, navigation }) {
   const { user } = useAuth();
   const [trips, setTrips] = useState([]);
@@ -22,6 +29,7 @@ export function SendScreen({ route, navigation }) {
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [drinkType, setDrinkType] = useState('water');
   const [note, setNote] = useState('');
+  const [scheduleDelay, setScheduleDelay] = useState(0);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -95,6 +103,11 @@ export function SendScreen({ route, navigation }) {
 
     setSending(true);
 
+    const scheduledAt =
+      scheduleDelay > 0
+        ? new Date(Date.now() + scheduleDelay * 60 * 1000).toISOString()
+        : null;
+
     const { data: ping, error } = await supabase
       .from('drink_pings')
       .insert({
@@ -103,6 +116,7 @@ export function SendScreen({ route, navigation }) {
         to_user_id: selectedUserId,
         type: drinkType,
         sender_note: note.trim() || null,
+        scheduled_at: scheduledAt,
       })
       .select('id')
       .single();
@@ -113,9 +127,9 @@ export function SendScreen({ route, navigation }) {
       return;
     }
 
-    // Send push notification to recipient
+    // Send push notification immediately only if not scheduled
     const recipient = members.find((m) => m.id === selectedUserId);
-    if (recipient?.expo_push_token) {
+    if (!scheduledAt && recipient?.expo_push_token) {
       const { data: senderProfile } = await supabase
         .from('users')
         .select('name')
@@ -134,11 +148,15 @@ export function SendScreen({ route, navigation }) {
 
     const emoji = drinkType === 'water' ? '💧' : '🍾';
     const recipientName = recipient?.name || recipient?.email || 'them';
-    Alert.alert('Sent!', `${emoji} Ping sent to ${recipientName}!`, [
+    const scheduleMsg = scheduledAt
+      ? ` (scheduled for ${scheduleDelay >= 60 ? `${scheduleDelay / 60}h` : `${scheduleDelay}m`} from now)`
+      : '';
+    Alert.alert('Sent!', `${emoji} Ping sent to ${recipientName}!${scheduleMsg}`, [
       {
         text: 'OK',
         onPress: () => {
           setNote('');
+          setScheduleDelay(0);
           // Clear params so screen resets on next visit
           navigation.setParams({
             tripId: undefined,
@@ -304,6 +322,37 @@ export function SendScreen({ route, navigation }) {
         />
       </View>
 
+      {/* Schedule timing */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>When</Text>
+        <View style={styles.scheduleRow}>
+          {SCHEDULE_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.scheduleChip,
+                scheduleDelay === opt.value && styles.scheduleChipActive,
+              ]}
+              onPress={() => setScheduleDelay(opt.value)}
+            >
+              <Text
+                style={[
+                  styles.scheduleChipText,
+                  scheduleDelay === opt.value && styles.scheduleChipTextActive,
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {scheduleDelay > 0 && (
+          <Text style={styles.scheduleNote}>
+            Will be sent in {scheduleDelay >= 60 ? `${scheduleDelay / 60} hour${scheduleDelay > 60 ? 's' : ''}` : `${scheduleDelay} minutes`}
+          </Text>
+        )}
+      </View>
+
       {/* Send button */}
       <TouchableOpacity
         style={[styles.sendButton, sending && styles.sendButtonDisabled]}
@@ -313,7 +362,9 @@ export function SendScreen({ route, navigation }) {
         <Text style={styles.sendButtonText}>
           {sending
             ? 'Sending...'
-            : `Send ${drinkType === 'water' ? '💧' : '🍾'} Ping`}
+            : scheduleDelay > 0
+              ? `Schedule ${drinkType === 'water' ? '💧' : '🍾'} Ping`
+              : `Send ${drinkType === 'water' ? '💧' : '🍾'} Ping`}
         </Text>
       </TouchableOpacity>
     </ScrollView>
@@ -453,6 +504,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafafa',
     minHeight: 60,
     textAlignVertical: 'top',
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  scheduleChip: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#F5F7FA',
+    alignItems: 'center',
+  },
+  scheduleChipActive: {
+    backgroundColor: '#4A90D9',
+  },
+  scheduleChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+  },
+  scheduleChipTextActive: {
+    color: '#fff',
+  },
+  scheduleNote: {
+    fontSize: 13,
+    color: '#888',
+    marginTop: 8,
+    textAlign: 'center',
   },
   sendButton: {
     backgroundColor: '#4A90D9',

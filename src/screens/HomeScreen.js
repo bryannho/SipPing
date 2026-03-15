@@ -27,12 +27,34 @@ export function HomeScreen({ navigation }) {
   const fetchTrips = useCallback(async () => {
     const { data } = await supabase
       .from('trip_members')
-      .select('trip_id, trips(id, name, status, invite_code, start_date)')
+      .select('trip_id, trips(id, name, status, invite_code, start_date, end_date)')
       .eq('user_id', user.id);
 
-    const activeTrips = (data || [])
+    const allTrips = (data || [])
       .map((tm) => tm.trips)
-      .filter((t) => t && t.status === 'active');
+      .filter(Boolean);
+
+    // Auto-complete trips past their end_date
+    const today = new Date().toISOString().split('T')[0];
+    const tripsToComplete = allTrips.filter(
+      (t) => t.status === 'active' && t.end_date && t.end_date < today
+    );
+    if (tripsToComplete.length > 0) {
+      await Promise.all(
+        tripsToComplete.map((t) =>
+          supabase
+            .from('trips')
+            .update({ status: 'completed' })
+            .eq('id', t.id)
+        )
+      );
+      // Update local state
+      tripsToComplete.forEach((t) => {
+        t.status = 'completed';
+      });
+    }
+
+    const activeTrips = allTrips.filter((t) => t.status === 'active');
 
     setTrips(activeTrips);
     return activeTrips;
