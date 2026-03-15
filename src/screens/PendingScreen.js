@@ -28,7 +28,7 @@ export function PendingScreen() {
         '*, sender:users!drink_pings_from_user_id_fkey(name, email), trip:trips(name)'
       )
       .eq('to_user_id', user.id)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'snoozed'])
       .order('created_at', { ascending: false });
 
     if (!error && data) {
@@ -137,7 +137,13 @@ export function PendingScreen() {
       .eq('id', ping.id);
 
     setActionLoading(null);
-    setPings((prev) => prev.filter((p) => p.id !== ping.id));
+    setPings((prev) =>
+      prev.map((p) =>
+        p.id === ping.id
+          ? { ...p, status: 'snoozed', snoozed_until: snoozedUntil, snooze_count: p.snooze_count + 1 }
+          : p
+      )
+    );
   };
 
   const onRefresh = async () => {
@@ -157,14 +163,28 @@ export function PendingScreen() {
     return date.toLocaleDateString();
   };
 
+  const formatSnoozeRemaining = (snoozedUntil) => {
+    const until = new Date(snoozedUntil);
+    const now = new Date();
+    const diffMs = until - now;
+    if (diffMs <= 0) return 'Unsnoozing soon...';
+    const mins = Math.ceil(diffMs / 60000);
+    if (mins >= 60) {
+      const hrs = Math.floor(mins / 60);
+      return `Unsnoozes in ${hrs}h ${mins % 60}m`;
+    }
+    return `Unsnoozes in ${mins}m`;
+  };
+
   const renderPing = ({ item }) => {
     const isActioning = actionLoading === item.id;
+    const isSnoozed = item.status === 'snoozed';
     const emoji = item.type === 'water' ? '💧' : '🍾';
     const senderName = item.sender?.name || item.sender?.email || 'Someone';
     const tripName = item.trip?.name || '';
 
     return (
-      <View style={styles.pingCard}>
+      <View style={[styles.pingCard, isSnoozed && styles.pingCardSnoozed]}>
         <View style={styles.pingHeader}>
           <Text style={styles.pingEmoji}>{emoji}</Text>
           <View style={styles.pingInfo}>
@@ -173,7 +193,22 @@ export function PendingScreen() {
               {tripName} · {formatTime(item.created_at)}
             </Text>
           </View>
+          {isSnoozed && (
+            <View style={styles.snoozedBadge}>
+              <Ionicons name="time" size={12} color="#E67E22" />
+              <Text style={styles.snoozedBadgeText}>Snoozed</Text>
+            </View>
+          )}
         </View>
+
+        {isSnoozed && item.snoozed_until && (
+          <View style={styles.snoozeInfo}>
+            <Ionicons name="alarm-outline" size={14} color="#E67E22" />
+            <Text style={styles.snoozeInfoText}>
+              {formatSnoozeRemaining(item.snoozed_until)}
+            </Text>
+          </View>
+        )}
 
         {item.sender_note && (
           <View style={styles.noteContainer}>
@@ -196,13 +231,15 @@ export function PendingScreen() {
               <Ionicons name="checkmark" size={18} color="#fff" />
               <Text style={styles.acceptText}>Accept</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.snoozeButton}
-              onPress={() => handleSnooze(item)}
-            >
-              <Ionicons name="time-outline" size={18} color="#E67E22" />
-              <Text style={styles.snoozeText}>Later</Text>
-            </TouchableOpacity>
+            {!isSnoozed && (
+              <TouchableOpacity
+                style={styles.snoozeButton}
+                onPress={() => handleSnooze(item)}
+              >
+                <Ionicons name="time-outline" size={18} color="#E67E22" />
+                <Text style={styles.snoozeText}>Later</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.declineButton}
               onPress={() => handleDecline(item)}
@@ -291,6 +328,39 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
+  },
+  pingCardSnoozed: {
+    backgroundColor: '#FFFAF3',
+    borderWidth: 1,
+    borderColor: '#F5DEB3',
+  },
+  snoozedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5EB',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  snoozedBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#E67E22',
+  },
+  snoozeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5EB',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 10,
+    gap: 6,
+  },
+  snoozeInfoText: {
+    fontSize: 13,
+    color: '#E67E22',
+    fontWeight: '500',
   },
   pingHeader: {
     flexDirection: 'row',
