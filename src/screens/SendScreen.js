@@ -321,6 +321,8 @@ export function SendScreen({ route, navigation }) {
           onChangeText={setNote}
           maxLength={200}
           multiline
+          blurOnSubmit={true}
+          returnKeyType="done"
         />
       </View>
 

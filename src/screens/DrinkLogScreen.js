@@ -28,6 +28,8 @@ export function DrinkLogScreen({ route }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewingImage, setViewingImage] = useState(null);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
 
   const fetchTrips = useCallback(async () => {
     const { data } = await supabase
@@ -48,6 +50,8 @@ export function DrinkLogScreen({ route }) {
     return allTrips;
   }, [user.id]);
 
+  const [signedUrls, setSignedUrls] = useState({});
+
   const fetchLogs = useCallback(async (tripId) => {
     if (!tripId) return;
 
@@ -57,7 +61,27 @@ export function DrinkLogScreen({ route }) {
       .eq('trip_id', tripId)
       .order('logged_at', { ascending: false });
 
-    setLogs(data || []);
+    const rows = data || [];
+    setLogs(rows);
+
+    // Generate signed URLs for any logs with photos
+    const photoPaths = rows
+      .filter((l) => l.image_url)
+      .map((l) => l.image_url);
+
+    if (photoPaths.length > 0) {
+      const { data: signed } = await supabase.storage
+        .from('drink-photos')
+        .createSignedUrls(photoPaths, 3600);
+
+      if (signed) {
+        const urlMap = {};
+        signed.forEach((s) => {
+          if (s.signedUrl) urlMap[s.path] = s.signedUrl;
+        });
+        setSignedUrls(urlMap);
+      }
+    }
   }, []);
 
   const loadAll = useCallback(async () => {
@@ -175,9 +199,13 @@ export function DrinkLogScreen({ route }) {
             {item.type}
           </Text>
         </View>
-        {item.image_url && (
+        {item.image_url && signedUrls[item.image_url] && (
           <TouchableOpacity
-            onPress={() => setViewingImage(item.image_url)}
+            onPress={() => {
+              setImageLoading(true);
+              setImageError(false);
+              setViewingImage(signedUrls[item.image_url]);
+            }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Ionicons
@@ -285,11 +313,32 @@ export function DrinkLogScreen({ route }) {
             <Ionicons name="close-circle" size={36} color="#fff" />
           </TouchableOpacity>
           {viewingImage && (
-            <Image
-              source={{ uri: viewingImage }}
-              style={styles.fullImage}
-              resizeMode="contain"
-            />
+            imageError ? (
+              <View style={styles.imageErrorContainer}>
+                <Ionicons name="image-outline" size={48} color="#888" />
+                <Text style={styles.imageErrorText}>Failed to load image</Text>
+              </View>
+            ) : (
+              <>
+                {imageLoading && (
+                  <ActivityIndicator
+                    size="large"
+                    color="#fff"
+                    style={styles.imageLoader}
+                  />
+                )}
+                <Image
+                  source={{ uri: viewingImage }}
+                  style={styles.fullImage}
+                  resizeMode="contain"
+                  onLoadEnd={() => setImageLoading(false)}
+                  onError={() => {
+                    setImageLoading(false);
+                    setImageError(true);
+                  }}
+                />
+              </>
+            )
           )}
         </View>
       </Modal>
@@ -451,5 +500,17 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH - 32,
     height: SCREEN_WIDTH - 32,
     borderRadius: 8,
+  },
+  imageLoader: {
+    position: 'absolute',
+  },
+  imageErrorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageErrorText: {
+    color: '#888',
+    fontSize: 15,
+    marginTop: 10,
   },
 });

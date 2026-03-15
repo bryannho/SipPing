@@ -11,7 +11,7 @@ const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
  * Launch camera or photo library, compress, and upload to Supabase Storage.
  * Returns the public URL or null if cancelled/failed.
  */
-export async function pickAndUploadDrinkPhoto(userId, pingId) {
+export async function pickAndUploadDrinkPhoto(userId, tripId, pingId) {
   const choice = await new Promise((resolve) => {
     Alert.alert(
       'Add a Photo',
@@ -67,20 +67,26 @@ export async function pickAndUploadDrinkPhoto(userId, pingId) {
       { compress: JPEG_QUALITY, format: ImageManipulator.SaveFormat.JPEG }
     );
 
-    // Read the file as blob for upload
-    const response = await fetch(compressed.uri);
-    const blob = await response.blob();
+    // Read the file as ArrayBuffer (fetch().blob() is unreliable in React Native)
+    const arrayBuffer = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', compressed.uri, true);
+      xhr.responseType = 'arraybuffer';
+      xhr.onload = () => resolve(xhr.response);
+      xhr.onerror = () => reject(new Error('Failed to read file'));
+      xhr.send();
+    });
 
-    if (blob.size > MAX_FILE_SIZE) {
+    if (arrayBuffer.byteLength > MAX_FILE_SIZE) {
       Alert.alert('File too large', 'Please choose a smaller photo (max 2MB).');
       return null;
     }
 
     // Upload to Supabase Storage
-    const fileName = `${userId}/${pingId}_${Date.now()}.jpg`;
+    const fileName = `${userId}/${tripId}/${pingId}_${Date.now()}.jpg`;
     const { error: uploadError } = await supabase.storage
       .from('drink-photos')
-      .upload(fileName, blob, {
+      .upload(fileName, arrayBuffer, {
         contentType: 'image/jpeg',
         upsert: false,
       });
@@ -91,12 +97,8 @@ export async function pickAndUploadDrinkPhoto(userId, pingId) {
       return null;
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('drink-photos')
-      .getPublicUrl(fileName);
-
-    return urlData?.publicUrl || null;
+    // Return the storage path (not a URL) — signed URLs are generated at display time
+    return fileName;
   } catch (e) {
     console.warn('Image processing error:', e);
     return null;

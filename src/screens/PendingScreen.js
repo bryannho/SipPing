@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -24,6 +25,8 @@ export function PendingScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [animation, setAnimation] = useState(null); // { type: 'water' | 'shot' }
+  const [successMessage, setSuccessMessage] = useState(null);
+  const successOpacity = useRef(new Animated.Value(0)).current;
 
   const fetchPendingPings = useCallback(async () => {
     const { data, error } = await supabase
@@ -67,6 +70,24 @@ export function PendingScreen() {
       supabase.removeChannel(channel);
     };
   }, [user.id, fetchPendingPings]);
+
+  const showSuccessBanner = (message) => {
+    setSuccessMessage(message);
+    successOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(successOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.delay(1200),
+      Animated.timing(successOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setSuccessMessage(null));
+  };
 
   const handleAccept = async (ping) => {
     setActionLoading(ping.id);
@@ -113,13 +134,21 @@ export function PendingScreen() {
     setPings((prev) => prev.filter((p) => p.id !== ping.id));
     setActionLoading(null);
 
+    // Show success banner, then offer photo upload after a brief delay
+    const emoji = ping.type === 'water' ? '💧' : '🍾';
+    showSuccessBanner(`${emoji} Drink accepted!`);
+
+    // Wait for banner to be visible before prompting photo
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
     // Offer photo upload (non-blocking — drink is already logged)
-    const imageUrl = await pickAndUploadDrinkPhoto(user.id, ping.id);
+    const imageUrl = await pickAndUploadDrinkPhoto(user.id, ping.trip_id, ping.id);
     if (imageUrl && logEntry?.id) {
       await supabase
         .from('drink_log')
         .update({ image_url: imageUrl })
         .eq('id', logEntry.id);
+      showSuccessBanner('📸 Photo uploaded!');
     }
   };
 
@@ -294,6 +323,12 @@ export function PendingScreen() {
         visible={!!animation}
         onComplete={() => setAnimation(null)}
       />
+      {successMessage && (
+        <Animated.View style={[styles.successBanner, { opacity: successOpacity }]}>
+          <Ionicons name="checkmark-circle" size={20} color="#fff" />
+          <Text style={styles.successBannerText}>{successMessage}</Text>
+        </Animated.View>
+      )}
       <FlatList
         data={pings}
         renderItem={renderPing}
@@ -481,5 +516,19 @@ const styles = StyleSheet.create({
   },
   actionLoader: {
     paddingVertical: 14,
+  },
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#27AE60',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  successBannerText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
