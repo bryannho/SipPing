@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sipping.app"
+      "bundleIdentifier": "com.sipping.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.sipping.app",
@@ -23,7 +26,10 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -43,6 +49,11 @@
           "iosUrlScheme": "com.googleusercontent.apps.548564308554-em87ricsaa8d347ijhclug7u9a5nsslt"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c9da55d9-de8f-455e-a4f4-82d1e60b9a92"
+      }
+    }
   }
 }
