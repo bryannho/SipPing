@@ -4,6 +4,7 @@ import { StatsScreen } from '../screens/StatsScreen';
 import { DrinkLogScreen } from '../screens/DrinkLogScreen';
 import { ScheduleRulesScreen } from '../screens/ScheduleRulesScreen';
 import { CreateScheduleRuleScreen } from '../screens/CreateScheduleRuleScreen';
+import { AccountScreen } from '../screens/AccountScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -18,7 +19,9 @@ export function StatsStack() {
       <Stack.Screen
         name="DrinkLog"
         component={DrinkLogScreen}
-        options={{ title: 'Drink Log' }}
+        options={({ route }) => ({
+          title: route.params?.tripName ? `${route.params.tripName} Log` : 'Drink Log',
+        })}
       />
       <Stack.Screen
         name="ScheduleRules"
@@ -31,6 +34,11 @@ export function StatsStack() {
         options={({ route }) => ({
           title: route.params?.editRule ? 'Edit Schedule' : 'New Schedule',
         })}
+      />
+      <Stack.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{ title: 'Account' }}
       />
     </Stack.Navigator>
   );

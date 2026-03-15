@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { sendDrinkPingNotification } from '../utils/pushNotifications';
+import { playSendSound } from '../utils/sounds';
 
 const SCHEDULE_OPTIONS = [
   { label: 'Now', value: 0 },
@@ -145,6 +146,7 @@ export function SendScreen({ route, navigation }) {
     }
 
     setSending(false);
+    await playSendSound();
 
     const emoji = drinkType === 'water' ? '💧' : '🍾';
     const recipientName = recipient?.name || recipient?.email || 'them';

@@ -15,6 +15,7 @@ import {
   setupNotificationCategories,
   handleNotificationAction,
 } from './src/utils/pushNotifications';
+import { loadSounds, unloadSounds } from './src/utils/sounds';
 
 function AppContent() {
   const appState = useRef(AppState.currentState);
@@ -23,6 +24,11 @@ function AppContent() {
   useEffect(() => {
     setupNotificationListeners();
     setupNotificationCategories();
+    loadSounds();
+
+    return () => {
+      unloadSounds();
+    };
   }, []);
 
   // Handle notification tap / action button responses

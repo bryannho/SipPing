@@ -13,6 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { pickAndUploadDrinkPhoto } from '../utils/imageUpload';
+import { playAcceptHaptic, playDeclineHaptic } from '../utils/sounds';
+import { PingAnimation } from '../components/PingAnimation';
 
 export function PendingScreen() {
   const { user } = useAuth();
@@ -20,6 +23,7 @@ export function PendingScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
+  const [animation, setAnimation] = useState(null); // { type: 'water' | 'shot' }
 
   const fetchPendingPings = useCallback(async () => {
     const { data, error } = await supabase
@@ -66,6 +70,10 @@ export function PendingScreen() {
 
   const handleAccept = async (ping) => {
     setActionLoading(ping.id);
+    await playAcceptHaptic();
+
+    // Show animation
+    setAnimation({ type: ping.type });
 
     const { error: updateError } = await supabase
       .from('drink_pings')
@@ -77,25 +85,42 @@ export function PendingScreen() {
 
     if (updateError) {
       setActionLoading(null);
+      setAnimation(null);
       Alert.alert('Error', updateError.message);
       return;
     }
 
-    const { error: logError } = await supabase.from('drink_log').insert({
-      trip_id: ping.trip_id,
-      user_id: user.id,
-      type: ping.type,
-      ping_id: ping.id,
-    });
-
-    setActionLoading(null);
+    // Insert drink log entry (without photo first)
+    const { data: logEntry, error: logError } = await supabase
+      .from('drink_log')
+      .insert({
+        trip_id: ping.trip_id,
+        user_id: user.id,
+        type: ping.type,
+        ping_id: ping.id,
+      })
+      .select('id')
+      .single();
 
     if (logError) {
+      setActionLoading(null);
+      setAnimation(null);
       Alert.alert('Error', logError.message);
       return;
     }
 
+    // Remove ping from list
     setPings((prev) => prev.filter((p) => p.id !== ping.id));
+    setActionLoading(null);
+
+    // Offer photo upload (non-blocking — drink is already logged)
+    const imageUrl = await pickAndUploadDrinkPhoto(user.id, ping.id);
+    if (imageUrl && logEntry?.id) {
+      await supabase
+        .from('drink_log')
+        .update({ image_url: imageUrl })
+        .eq('id', logEntry.id);
+    }
   };
 
   const handleDecline = (ping) => {
@@ -106,6 +131,7 @@ export function PendingScreen() {
         style: 'destructive',
         onPress: async () => {
           setActionLoading(ping.id);
+          await playDeclineHaptic();
 
           await supabase
             .from('drink_pings')
@@ -263,6 +289,11 @@ export function PendingScreen() {
 
   return (
     <View style={styles.container}>
+      <PingAnimation
+        type={animation?.type}
+        visible={!!animation}
+        onComplete={() => setAnimation(null)}
+      />
       <FlatList
         data={pings}
         renderItem={renderPing}

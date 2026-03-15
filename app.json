@@ -29,7 +29,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SipPing uses your photos to share drink pics with friends.",
+          "cameraPermission": "SipPing uses your camera to take drink photos."
+        }
+      ]
     ]
   }
 }

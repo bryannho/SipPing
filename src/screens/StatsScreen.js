@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,12 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import ViewShot from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 
@@ -20,6 +23,8 @@ export function StatsScreen({ navigation }) {
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const viewShotRef = useRef();
 
   const fetchTrips = useCallback(async () => {
     const { data } = await supabase
@@ -181,6 +186,27 @@ export function StatsScreen({ navigation }) {
     setRefreshing(false);
   };
 
+  const handleShare = async () => {
+    if (!viewShotRef.current) return;
+
+    setSharing(true);
+    try {
+      const uri = await viewShotRef.current.capture();
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: 'Share Trip Stats',
+        });
+      } else {
+        Alert.alert('Sharing not available', 'Sharing is not supported on this device.');
+      }
+    } catch (e) {
+      console.warn('Share error:', e);
+    }
+    setSharing(false);
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -259,7 +285,10 @@ export function StatsScreen({ navigation }) {
         <TouchableOpacity
           style={styles.linkCard}
           onPress={() =>
-            navigation.navigate('DrinkLog', { tripId: selectedTripId })
+            navigation.navigate('DrinkLog', {
+              tripId: selectedTripId,
+              tripName: selectedTrip?.name,
+            })
           }
         >
           <Ionicons name="list-outline" size={22} color="#4A90D9" />
@@ -278,87 +307,125 @@ export function StatsScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Leaderboard */}
-      <Text style={styles.sectionTitle}>Leaderboard</Text>
+      {/* Shareable leaderboard */}
+      <ViewShot
+        ref={viewShotRef}
+        options={{ format: 'png', quality: 1 }}
+        style={styles.shareableCard}
+      >
+        <View style={styles.shareCardInner}>
+          <Text style={styles.sectionTitle}>Leaderboard</Text>
 
-      {stats.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyCardText}>
-            No activity yet. Start sending pings!
-          </Text>
-        </View>
-      ) : (
-        stats.map((member, index) => (
-          <View
-            key={member.id}
-            style={[styles.memberCard, member.isCurrentUser && styles.memberCardSelf]}
-          >
-            <View style={styles.memberHeader}>
-              <View style={styles.rankBadge}>
-                <Text style={styles.rankText}>#{index + 1}</Text>
-              </View>
-              <View style={styles.memberAvatar}>
-                <Text style={styles.memberInitial}>
-                  {(member.name || '?')[0].toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.memberInfo}>
-                <Text style={styles.memberName}>
-                  {member.name}
-                  {member.isCurrentUser ? ' (You)' : ''}
-                </Text>
-                <Text style={styles.memberTotal}>
-                  {member.totalDrinks} drink{member.totalDrinks !== 1 ? 's' : ''} total
-                </Text>
-              </View>
-              {member.streak > 0 && (
-                <View style={styles.streakBadge}>
-                  <Text style={styles.streakEmoji}>🔥</Text>
-                  <Text style={styles.streakCount}>{member.streak}</Text>
+          {stats.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyCardText}>
+                No activity yet. Start sending pings!
+              </Text>
+            </View>
+          ) : (
+            stats.map((member, index) => (
+              <View
+                key={member.id}
+                style={[styles.memberCard, member.isCurrentUser && styles.memberCardSelf]}
+              >
+                <View style={styles.memberHeader}>
+                  <View style={styles.rankBadge}>
+                    <Text style={styles.rankText}>#{index + 1}</Text>
+                  </View>
+                  <View style={styles.memberAvatar}>
+                    <Text style={styles.memberInitial}>
+                      {(member.name || '?')[0].toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.memberInfo}>
+                    <Text style={styles.memberName}>
+                      {member.name}
+                      {member.isCurrentUser ? ' (You)' : ''}
+                    </Text>
+                    <Text style={styles.memberTotal}>
+                      {member.totalDrinks} drink{member.totalDrinks !== 1 ? 's' : ''} total
+                    </Text>
+                  </View>
+                  {member.streak > 0 && (
+                    <View style={styles.streakBadge}>
+                      <Text style={styles.streakEmoji}>🔥</Text>
+                      <Text style={styles.streakCount}>{member.streak}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
 
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  💧 {member.watersSent + member.watersReceived}
-                </Text>
-                <Text style={styles.statLabel}>Waters</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  🍾 {member.shotsSent + member.shotsReceived}
-                </Text>
-                <Text style={styles.statLabel}>Shots</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {member.acceptanceRate !== null
-                    ? `${member.acceptanceRate}%`
-                    : '—'}
-                </Text>
-                <Text style={styles.statLabel}>Accept Rate</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {member.streak > 0 ? `${member.streak}d` : '—'}
-                </Text>
-                <Text style={styles.statLabel}>Streak</Text>
-              </View>
-            </View>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      💧 {member.watersSent + member.watersReceived}
+                    </Text>
+                    <Text style={styles.statLabel}>Waters</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      🍾 {member.shotsSent + member.shotsReceived}
+                    </Text>
+                    <Text style={styles.statLabel}>Shots</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {member.acceptanceRate !== null
+                        ? `${member.acceptanceRate}%`
+                        : '—'}
+                    </Text>
+                    <Text style={styles.statLabel}>Accept Rate</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {member.streak > 0 ? `${member.streak}d` : '—'}
+                    </Text>
+                    <Text style={styles.statLabel}>Streak</Text>
+                  </View>
+                </View>
 
-            <View style={styles.detailRow}>
-              <Text style={styles.detailText}>
-                Sent: {member.watersSent}💧 {member.shotsSent}🍾
-              </Text>
-              <Text style={styles.detailText}>
-                Received: {member.watersReceived}💧 {member.shotsReceived}🍾
-              </Text>
-            </View>
-          </View>
-        ))
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailText}>
+                    Sent: {member.watersSent}💧 {member.shotsSent}🍾
+                  </Text>
+                  <Text style={styles.detailText}>
+                    Received: {member.watersReceived}💧 {member.shotsReceived}🍾
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+
+          <Text style={styles.watermark}>SipPing</Text>
+        </View>
+      </ViewShot>
+
+      {/* Share button */}
+      {stats.length > 0 && (
+        <TouchableOpacity
+          style={styles.shareButton}
+          onPress={handleShare}
+          disabled={sharing}
+        >
+          {sharing ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="share-outline" size={18} color="#fff" />
+              <Text style={styles.shareButtonText}>Share Stats</Text>
+            </>
+          )}
+        </TouchableOpacity>
       )}
+
+      {/* Account link */}
+      <TouchableOpacity
+        style={styles.accountLink}
+        onPress={() => navigation.navigate('Account')}
+      >
+        <Ionicons name="person-circle-outline" size={22} color="#888" />
+        <Text style={styles.accountLinkText}>Account Settings</Text>
+        <Ionicons name="chevron-forward" size={16} color="#ccc" />
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -449,6 +516,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1a1a1a',
   },
+  shareableCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  shareCardInner: {
+    backgroundColor: '#F5F7FA',
+    borderRadius: 16,
+    padding: 20,
+  },
   sectionTitle: {
     fontSize: 17,
     fontWeight: '600',
@@ -456,7 +533,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   emptyCard: {
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#fff',
     borderRadius: 14,
     padding: 24,
     alignItems: 'center',
@@ -467,7 +544,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   memberCard: {
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#fff',
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
@@ -568,5 +645,41 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: 12,
     color: '#888',
+  },
+  watermark: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#ccc',
+    marginTop: 12,
+    fontWeight: '600',
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4A90D9',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 16,
+    gap: 8,
+  },
+  shareButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  accountLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F7FA',
+    borderRadius: 12,
+    padding: 16,
+    gap: 10,
+  },
+  accountLinkText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#888',
+    fontWeight: '500',
   },
 });

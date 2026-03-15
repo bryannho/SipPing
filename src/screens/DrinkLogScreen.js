@@ -3,16 +3,21 @@ import {
   View,
   Text,
   FlatList,
+  Image,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export function DrinkLogScreen({ route }) {
   const { user } = useAuth();
@@ -22,6 +27,7 @@ export function DrinkLogScreen({ route }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [viewingImage, setViewingImage] = useState(null);
 
   const fetchTrips = useCallback(async () => {
     const { data } = await supabase
@@ -170,12 +176,17 @@ export function DrinkLogScreen({ route }) {
           </Text>
         </View>
         {item.image_url && (
-          <Ionicons
-            name="camera-outline"
-            size={16}
-            color="#888"
-            style={styles.photoIcon}
-          />
+          <TouchableOpacity
+            onPress={() => setViewingImage(item.image_url)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name="camera"
+              size={18}
+              color="#4A90D9"
+              style={styles.photoIcon}
+            />
+          </TouchableOpacity>
         )}
       </View>
     );
@@ -258,6 +269,30 @@ export function DrinkLogScreen({ route }) {
           </View>
         }
       />
+
+      {/* Full-screen image viewer */}
+      <Modal
+        visible={!!viewingImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingImage(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalClose}
+            onPress={() => setViewingImage(null)}
+          >
+            <Ionicons name="close-circle" size={36} color="#fff" />
+          </TouchableOpacity>
+          {viewingImage && (
+            <Image
+              source={{ uri: viewingImage }}
+              style={styles.fullImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -399,5 +434,22 @@ const styles = StyleSheet.create({
   },
   photoIcon: {
     marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalClose: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 10,
+  },
+  fullImage: {
+    width: SCREEN_WIDTH - 32,
+    height: SCREEN_WIDTH - 32,
+    borderRadius: 8,
   },
 });
