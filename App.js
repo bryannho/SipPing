@@ -1,20 +1,59 @@
+import React, { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NetworkProvider } from './src/contexts/NetworkContext';
+import { AuthProvider, AuthContext } from './src/contexts/AuthContext';
+import { RootNavigator } from './src/navigation/RootNavigator';
+import { linking } from './src/navigation/linking';
+import {
+  registerPushToken,
+  setupNotificationListeners,
+} from './src/utils/pushNotifications';
 
-export default function App() {
+function AppContent() {
+  const appState = useRef(AppState.currentState);
+  const { user } = React.useContext(AuthContext);
+
+  useEffect(() => {
+    setupNotificationListeners();
+  }, []);
+
+  // Re-register push token when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active' &&
+        user
+      ) {
+        registerPushToken(user.id);
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => subscription.remove();
+  }, [user]);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
+    <>
       <StatusBar style="auto" />
-    </View>
+      <RootNavigator />
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <NetworkProvider>
+        <AuthProvider>
+          <NavigationContainer linking={linking}>
+            <AppContent />
+          </NavigationContainer>
+        </AuthProvider>
+      </NetworkProvider>
+    </SafeAreaProvider>
+  );
+}
