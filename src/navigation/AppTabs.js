@@ -1,18 +1,20 @@
 import React from 'react';
+import { StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeStack } from './HomeStack';
-import { PendingStack } from './PendingStack';
 import { SendStack } from './SendStack';
-import { StatsStack } from './StatsStack';
+import { ActivityStack } from './ActivityStack';
+import { MeStack } from './MeStack';
+import { colors, fonts } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
 const TAB_ICONS = {
   HomeTab: { focused: 'home', unfocused: 'home-outline' },
-  PendingTab: { focused: 'time', unfocused: 'time-outline' },
   SendTab: { focused: 'send', unfocused: 'send-outline' },
-  StatsTab: { focused: 'bar-chart', unfocused: 'bar-chart-outline' },
+  ActivityTab: { focused: 'pulse', unfocused: 'pulse-outline' },
+  MeTab: { focused: 'person', unfocused: 'person-outline' },
 };
 
 export function AppTabs() {
@@ -25,8 +27,13 @@ export function AppTabs() {
           const iconName = focused ? icons.focused : icons.unfocused;
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#4A90D9',
-        tabBarInactiveTintColor: '#999',
+        tabBarActiveTintColor: colors.cta,
+        tabBarInactiveTintColor: colors.textTertiary,
+        tabBarLabelStyle: {
+          fontFamily: fonts.bodyMedium,
+          fontSize: 11,
+        },
+        tabBarStyle: styles.tabBar,
       })}
     >
       <Tab.Screen
@@ -35,20 +42,38 @@ export function AppTabs() {
         options={{ title: 'Home' }}
       />
       <Tab.Screen
-        name="PendingTab"
-        component={PendingStack}
-        options={{ title: 'Pending' }}
-      />
-      <Tab.Screen
         name="SendTab"
         component={SendStack}
         options={{ title: 'Send' }}
       />
       <Tab.Screen
-        name="StatsTab"
-        component={StatsStack}
-        options={{ title: 'Stats' }}
+        name="ActivityTab"
+        component={ActivityStack}
+        options={{ title: 'Activity' }}
+      />
+      <Tab.Screen
+        name="MeTab"
+        component={MeStack}
+        options={{ title: 'Me' }}
       />
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderTopWidth: 0,
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(30, 43, 58, 0.1)',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 1,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+});

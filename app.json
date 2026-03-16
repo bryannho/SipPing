@@ -48,7 +48,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.548564308554-em87ricsaa8d347ijhclug7u9a5nsslt"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

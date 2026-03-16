@@ -8,7 +8,7 @@ export const linking = {
     screens: {
       App: {
         screens: {
-          HomeTab: {
+          MeTab: {
             screens: {
               JoinTrip: 'join-trip',
             },

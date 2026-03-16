@@ -1,28 +1,38 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
   ScrollView,
+  Alert,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { pickAndUploadDrinkPhoto } from '../utils/imageUpload';
+import { playAcceptHaptic, playDeclineHaptic } from '../utils/sounds';
+import { PingAnimation } from '../components/PingAnimation';
+import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 export function HomeScreen({ navigation }) {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [trips, setTrips] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [members, setMembers] = useState([]);
   const [todayStats, setTodayStats] = useState({ water: 0, shot: 0 });
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingPings, setPendingPings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [animation, setAnimation] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const successOpacity = useRef(new Animated.Value(0)).current;
+  const [tripDropdownOpen, setTripDropdownOpen] = useState(false);
 
   const fetchTrips = useCallback(async () => {
     const { data } = await supabase
@@ -34,7 +44,6 @@ export function HomeScreen({ navigation }) {
       .map((tm) => tm.trips)
       .filter(Boolean);
 
-    // Auto-complete trips past their end_date
     const today = new Date().toISOString().split('T')[0];
     const tripsToComplete = allTrips.filter(
       (t) => t.status === 'active' && t.end_date && t.end_date < today
@@ -48,14 +57,12 @@ export function HomeScreen({ navigation }) {
             .eq('id', t.id)
         )
       );
-      // Update local state
       tripsToComplete.forEach((t) => {
         t.status = 'completed';
       });
     }
 
     const activeTrips = allTrips.filter((t) => t.status === 'active');
-
     setTrips(activeTrips);
     return activeTrips;
   }, [user.id]);
@@ -83,10 +90,13 @@ export function HomeScreen({ navigation }) {
           .lt('logged_at', tomorrowStart.toISOString()),
         supabase
           .from('drink_pings')
-          .select('id', { count: 'exact', head: true })
+          .select(
+            '*, sender:users!drink_pings_from_user_id_fkey(name, email), trip:trips(name)'
+          )
           .eq('trip_id', tripId)
           .eq('to_user_id', user.id)
-          .eq('status', 'pending'),
+          .in('status', ['pending', 'snoozed'])
+          .order('created_at', { ascending: false }),
       ]);
 
       if (membersResult.data) {
@@ -105,7 +115,7 @@ export function HomeScreen({ navigation }) {
         setTodayStats(stats);
       }
 
-      setPendingCount(pendingResult.count || 0);
+      setPendingPings(pendingResult.data || []);
     },
     [user.id]
   );
@@ -128,7 +138,7 @@ export function HomeScreen({ navigation }) {
     }, [loadAll])
   );
 
-  // Realtime subscription for live updates
+  // Realtime subscriptions
   useEffect(() => {
     if (!selectedTripId) return;
 
@@ -177,6 +187,128 @@ export function HomeScreen({ navigation }) {
     setRefreshing(false);
   };
 
+  const showSuccessBanner = (message) => {
+    setSuccessMessage(message);
+    successOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(successOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.delay(1200),
+      Animated.timing(successOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setSuccessMessage(null));
+  };
+
+  const handleAccept = async (ping) => {
+    setActionLoading(ping.id);
+    await playAcceptHaptic();
+    setAnimation({ type: ping.type });
+
+    const { error: updateError } = await supabase
+      .from('drink_pings')
+      .update({
+        status: 'accepted',
+        responded_at: new Date().toISOString(),
+      })
+      .eq('id', ping.id);
+
+    if (updateError) {
+      setActionLoading(null);
+      setAnimation(null);
+      Alert.alert('Error', updateError.message);
+      return;
+    }
+
+    const { data: logEntry, error: logError } = await supabase
+      .from('drink_log')
+      .insert({
+        trip_id: ping.trip_id,
+        user_id: user.id,
+        type: ping.type,
+        ping_id: ping.id,
+      })
+      .select('id')
+      .single();
+
+    if (logError) {
+      setActionLoading(null);
+      setAnimation(null);
+      Alert.alert('Error', logError.message);
+      return;
+    }
+
+    setPendingPings((prev) => prev.filter((p) => p.id !== ping.id));
+    setActionLoading(null);
+
+    const emoji = ping.type === 'water' ? '💧' : '🍾';
+    showSuccessBanner(`${emoji} Drink accepted!`);
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    const imageUrl = await pickAndUploadDrinkPhoto(user.id, ping.trip_id, ping.id);
+    if (imageUrl && logEntry?.id) {
+      await supabase
+        .from('drink_log')
+        .update({ image_url: imageUrl })
+        .eq('id', logEntry.id);
+      showSuccessBanner('📸 Photo uploaded!');
+    }
+  };
+
+  const handleDecline = (ping) => {
+    Alert.alert('Decline Ping', 'Are you sure you want to decline?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          setActionLoading(ping.id);
+          await playDeclineHaptic();
+
+          await supabase
+            .from('drink_pings')
+            .update({
+              status: 'declined',
+              responded_at: new Date().toISOString(),
+            })
+            .eq('id', ping.id);
+
+          setActionLoading(null);
+          setPendingPings((prev) => prev.filter((p) => p.id !== ping.id));
+        },
+      },
+    ]);
+  };
+
+  const handleSnooze = async (ping) => {
+    setActionLoading(ping.id);
+    const snoozedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+    await supabase
+      .from('drink_pings')
+      .update({
+        status: 'snoozed',
+        snoozed_until: snoozedUntil,
+        snooze_count: ping.snooze_count + 1,
+      })
+      .eq('id', ping.id);
+
+    setActionLoading(null);
+    setPendingPings((prev) =>
+      prev.map((p) =>
+        p.id === ping.id
+          ? { ...p, status: 'snoozed', snoozed_until: snoozedUntil, snooze_count: p.snooze_count + 1 }
+          : p
+      )
+    );
+  };
+
   const handleQuickSend = (member, type) => {
     navigation.navigate('SendTab', {
       screen: 'Send',
@@ -189,38 +321,58 @@ export function HomeScreen({ navigation }) {
     });
   };
 
+  const formatTime = (dateStr) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMin = Math.floor((now - date) / 60000);
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    return date.toLocaleDateString();
+  };
+
+  const formatSnoozeRemaining = (snoozedUntil) => {
+    const until = new Date(snoozedUntil);
+    const now = new Date();
+    const diffMs = until - now;
+    if (diffMs <= 0) return 'Unsnoozing soon...';
+    const mins = Math.ceil(diffMs / 60000);
+    if (mins >= 60) {
+      const hrs = Math.floor(mins / 60);
+      return `Unsnoozes in ${hrs}h ${mins % 60}m`;
+    }
+    return `Unsnoozes in ${mins}m`;
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4A90D9" />
+        <ActivityIndicator size="large" color={colors.cta} />
       </View>
     );
   }
 
-  // Empty state — no trips
   if (trips.length === 0) {
     return (
       <View style={styles.centered}>
-        <Ionicons name="airplane-outline" size={64} color="#ccc" />
+        <Ionicons name="airplane-outline" size={64} color={colors.textTertiary} />
         <Text style={styles.emptyTitle}>No Active Trips</Text>
         <Text style={styles.emptySubtitle}>
           Create or join a trip to start pinging!
         </Text>
         <TouchableOpacity
           style={styles.primaryButton}
-          onPress={() => navigation.navigate('CreateTrip')}
+          onPress={() => navigation.navigate('MeTab', { screen: 'CreateTrip' })}
         >
           <Ionicons name="add-circle-outline" size={20} color="#fff" />
           <Text style={styles.primaryButtonText}>Create Trip</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => navigation.navigate('JoinTrip')}
+          onPress={() => navigation.navigate('MeTab', { screen: 'JoinTrip' })}
         >
           <Text style={styles.secondaryButtonText}>Join with Code</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.signOutLink} onPress={signOut}>
-          <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
     );
@@ -229,170 +381,236 @@ export function HomeScreen({ navigation }) {
   const selectedTrip = trips.find((t) => t.id === selectedTripId) || trips[0];
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      {/* Trip header / selector */}
-      <View style={styles.tripHeader}>
-        {trips.length > 1 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.tripSelector}
-          >
+    <View style={styles.container}>
+      <PingAnimation
+        type={animation?.type}
+        visible={!!animation}
+        onComplete={() => setAnimation(null)}
+      />
+      {successMessage && (
+        <Animated.View style={[styles.successBanner, { opacity: successOpacity }]}>
+          <Ionicons name="checkmark-circle" size={20} color="#fff" />
+          <Text style={styles.successBannerText}>{successMessage}</Text>
+        </Animated.View>
+      )}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Trip selector dropdown */}
+        <TouchableOpacity
+          style={styles.tripDropdown}
+          onPress={() => trips.length > 1 && setTripDropdownOpen(!tripDropdownOpen)}
+          activeOpacity={trips.length > 1 ? 0.7 : 1}
+        >
+          <Text style={styles.tripDropdownText}>{selectedTrip.name}</Text>
+          {trips.length > 1 && (
+            <Ionicons
+              name={tripDropdownOpen ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color={colors.textSecondary}
+            />
+          )}
+        </TouchableOpacity>
+
+        {tripDropdownOpen && trips.length > 1 && (
+          <View style={styles.tripDropdownMenu}>
             {trips.map((trip) => (
               <TouchableOpacity
                 key={trip.id}
                 style={[
-                  styles.tripTab,
-                  trip.id === selectedTripId && styles.tripTabActive,
+                  styles.tripDropdownItem,
+                  trip.id === selectedTripId && styles.tripDropdownItemActive,
                 ]}
                 onPress={() => {
                   setSelectedTripId(trip.id);
                   fetchTripData(trip.id);
+                  setTripDropdownOpen(false);
                 }}
               >
                 <Text
                   style={[
-                    styles.tripTabText,
-                    trip.id === selectedTripId && styles.tripTabTextActive,
+                    styles.tripDropdownItemText,
+                    trip.id === selectedTripId && styles.tripDropdownItemTextActive,
                   ]}
                   numberOfLines={1}
                 >
                   {trip.name}
                 </Text>
+                {trip.id === selectedTripId && (
+                  <Ionicons name="checkmark" size={18} color={colors.cta} />
+                )}
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        ) : (
-          <Text style={styles.tripName}>{selectedTrip.name}</Text>
-        )}
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate('TripDetail', {
-              tripId: selectedTrip.id,
-              tripName: selectedTrip.name,
-              inviteCode: selectedTrip.invite_code,
-            })
-          }
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="settings-outline" size={22} color="#666" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Today's stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statEmoji}>💧</Text>
-          <Text style={styles.statCount}>{todayStats.water}</Text>
-          <Text style={styles.statLabel}>Waters today</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statEmoji}>🍾</Text>
-          <Text style={styles.statCount}>{todayStats.shot}</Text>
-          <Text style={styles.statLabel}>Shots today</Text>
-        </View>
-      </View>
-
-      {/* Pending pings banner */}
-      {pendingCount > 0 && (
-        <TouchableOpacity
-          style={styles.pendingBanner}
-          onPress={() => navigation.navigate('PendingTab')}
-        >
-          <Ionicons name="notifications" size={18} color="#E67E22" />
-          <Text style={styles.pendingText}>
-            {pendingCount} pending ping{pendingCount !== 1 ? 's' : ''} — tap to
-            respond
-          </Text>
-          <Ionicons name="chevron-forward" size={16} color="#E67E22" />
-        </TouchableOpacity>
-      )}
-
-      {/* Quick send to members */}
-      <Text style={styles.sectionTitle}>Quick Send</Text>
-      {members.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyCardText}>
-            No other members yet. Share your invite code to add friends!
-          </Text>
-          <TouchableOpacity
-            style={styles.shareCodeButton}
-            onPress={() =>
-              navigation.navigate('TripDetail', {
-                tripId: selectedTrip.id,
-                tripName: selectedTrip.name,
-                inviteCode: selectedTrip.invite_code,
-              })
-            }
-          >
-            <Text style={styles.shareCodeButtonText}>Share Invite</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        members.map((member) => (
-          <View key={member.id} style={styles.memberCard}>
-            <View style={styles.memberAvatar}>
-              <Text style={styles.memberInitial}>
-                {(member.name || member.email || '?')[0].toUpperCase()}
-              </Text>
-            </View>
-            <Text style={styles.memberName} numberOfLines={1}>
-              {member.name || member.email}
-            </Text>
-            <TouchableOpacity
-              style={styles.quickSendBtn}
-              onPress={() => handleQuickSend(member, 'water')}
-            >
-              <Text style={styles.quickSendEmoji}>💧</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.quickSendBtn}
-              onPress={() => handleQuickSend(member, 'shot')}
-            >
-              <Text style={styles.quickSendEmoji}>🍾</Text>
-            </TouchableOpacity>
           </View>
-        ))
-      )}
+        )}
 
-      {/* Footer actions */}
-      <View style={styles.footerButtons}>
-        <TouchableOpacity
-          style={styles.footerButton}
-          onPress={() => navigation.navigate('CreateTrip')}
-        >
-          <Ionicons name="add-circle-outline" size={18} color="#4A90D9" />
-          <Text style={styles.footerButtonText}>New Trip</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.footerButton}
-          onPress={() => navigation.navigate('JoinTrip')}
-        >
-          <Ionicons name="enter-outline" size={18} color="#4A90D9" />
-          <Text style={styles.footerButtonText}>Join Trip</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Today's stats — gradient accent cards */}
+        <View style={styles.statsRow}>
+          <View style={[styles.statCard, styles.statCardWater]}>
+            <Text style={styles.statEmoji}>💧</Text>
+            <Text style={styles.statCount}>{todayStats.water}</Text>
+            <Text style={styles.statLabel}>Waters today</Text>
+          </View>
+          <View style={[styles.statCard, styles.statCardShot]}>
+            <Text style={styles.statEmoji}>🍾</Text>
+            <Text style={styles.statCount}>{todayStats.shot}</Text>
+            <Text style={styles.statLabel}>Shots today</Text>
+          </View>
+        </View>
 
-      <TouchableOpacity style={styles.signOutLink} onPress={signOut}>
-        <Text style={styles.signOutText}>Sign Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {/* Pending pings — inline cards */}
+        {pendingPings.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>
+              Pending ({pendingPings.length})
+            </Text>
+            {pendingPings.map((ping) => {
+              const isActioning = actionLoading === ping.id;
+              const isSnoozed = ping.status === 'snoozed';
+              const emoji = ping.type === 'water' ? '💧' : '🍾';
+              const senderName = ping.sender?.name || ping.sender?.email || 'Someone';
+              const accentColor = ping.type === 'water' ? colors.teal : colors.amber;
+
+              return (
+                <View key={ping.id} style={styles.pingCard}>
+                  <View style={[styles.pingAccent, { backgroundColor: accentColor }]} />
+                  <View style={styles.pingBody}>
+                    <View style={styles.pingHeader}>
+                      <Text style={styles.pingEmoji}>{emoji}</Text>
+                      <View style={styles.pingInfo}>
+                        <Text style={styles.pingSender}>{senderName}</Text>
+                        <Text style={styles.pingMeta}>
+                          {formatTime(ping.created_at)}
+                        </Text>
+                      </View>
+                      {isSnoozed && (
+                        <View style={styles.snoozedBadge}>
+                          <Ionicons name="time" size={12} color={colors.amber} />
+                          <Text style={styles.snoozedBadgeText}>Snoozed</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {isSnoozed && ping.snoozed_until && (
+                      <View style={styles.snoozeInfo}>
+                        <Ionicons name="alarm-outline" size={14} color={colors.amber} />
+                        <Text style={styles.snoozeInfoText}>
+                          {formatSnoozeRemaining(ping.snoozed_until)}
+                        </Text>
+                      </View>
+                    )}
+
+                    {ping.sender_note && (
+                      <View style={styles.noteContainer}>
+                        <Text style={styles.noteText}>"{ping.sender_note}"</Text>
+                      </View>
+                    )}
+
+                    {isActioning ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.cta}
+                        style={styles.actionLoader}
+                      />
+                    ) : (
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity
+                          style={styles.acceptButton}
+                          onPress={() => handleAccept(ping)}
+                        >
+                          <Ionicons name="checkmark" size={18} color="#fff" />
+                          <Text style={styles.acceptText}>Accept</Text>
+                        </TouchableOpacity>
+                        {!isSnoozed && (
+                          <TouchableOpacity
+                            style={styles.snoozeButton}
+                            onPress={() => handleSnooze(ping)}
+                          >
+                            <Ionicons name="time-outline" size={18} color={colors.amber} />
+                            <Text style={styles.snoozeText}>Later</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={styles.declineButton}
+                          onPress={() => handleDecline(ping)}
+                        >
+                          <Ionicons name="close" size={18} color={colors.error} />
+                          <Text style={styles.declineText}>Decline</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
+
+        {pendingPings.length === 0 && (
+          <View style={styles.allCaughtUp}>
+            <Ionicons name="checkmark-circle-outline" size={24} color={colors.success} />
+            <Text style={styles.allCaughtUpText}>All caught up!</Text>
+          </View>
+        )}
+
+        {/* Quick Send */}
+        <Text style={styles.sectionTitle}>Quick Send</Text>
+        {members.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyCardText}>
+              No other members yet. Share your invite code to add friends!
+            </Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.memberScroll}
+            contentContainerStyle={styles.memberScrollContent}
+          >
+            {members.map((member) => (
+              <View key={member.id} style={styles.memberCard}>
+                <View style={styles.memberAvatar}>
+                  <Text style={styles.memberInitial}>
+                    {(member.name || member.email || '?')[0].toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={styles.memberName} numberOfLines={1}>
+                  {member.name || member.email}
+                </Text>
+                <View style={styles.quickSendRow}>
+                  <TouchableOpacity
+                    style={[styles.quickSendBtn, styles.quickSendWater]}
+                    onPress={() => handleQuickSend(member, 'water')}
+                  >
+                    <Text style={styles.quickSendEmoji}>💧</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.quickSendBtn, styles.quickSendShot]}
+                    onPress={() => handleQuickSend(member, 'shot')}
+                  >
+                    <Text style={styles.quickSendEmoji}>🍾</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
   },
   scrollContent: {
-    padding: 20,
+    padding: spacing.lg,
     paddingTop: 60,
     paddingBottom: 40,
   },
@@ -400,226 +618,365 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 32,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.xl,
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginTop: 16,
-    marginBottom: 6,
+    ...typography.h2,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
   emptySubtitle: {
-    fontSize: 15,
-    color: '#888',
+    ...typography.caption,
     textAlign: 'center',
     marginBottom: 28,
   },
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4A90D9',
-    borderRadius: 10,
+    backgroundColor: colors.cta,
+    borderRadius: radii.md,
     paddingVertical: 14,
     paddingHorizontal: 28,
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   primaryButtonText: {
     color: '#fff',
+    fontFamily: fonts.bodySemiBold,
     fontSize: 16,
-    fontWeight: '600',
   },
   secondaryButton: {
-    borderWidth: 1,
-    borderColor: '#4A90D9',
-    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.cta,
+    borderRadius: radii.md,
     paddingVertical: 14,
     paddingHorizontal: 28,
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   secondaryButtonText: {
-    color: '#4A90D9',
+    color: colors.cta,
+    fontFamily: fonts.bodySemiBold,
     fontSize: 16,
-    fontWeight: '600',
   },
-  signOutLink: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  signOutText: {
-    color: '#E74C3C',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  tripHeader: {
+  // Trip dropdown
+  tripDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.card,
   },
-  tripName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1a1a1a',
+  tripDropdownText: {
+    ...typography.h2,
     flex: 1,
   },
-  tripSelector: {
+  tripDropdownMenu: {
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
+    ...shadows.card,
+  },
+  tripDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tripDropdownItemActive: {
+    backgroundColor: 'rgba(255, 107, 107, 0.06)',
+  },
+  tripDropdownItemText: {
+    ...typography.bodyMedium,
     flex: 1,
-    marginRight: 12,
   },
-  tripTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F0F0F0',
-    marginRight: 8,
+  tripDropdownItemTextActive: {
+    color: colors.cta,
+    fontFamily: fonts.bodySemiBold,
   },
-  tripTabActive: {
-    backgroundColor: '#4A90D9',
-  },
-  tripTabText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#666',
-  },
-  tripTabTextActive: {
-    color: '#fff',
-  },
+  // Stats
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
-    borderRadius: 14,
-    padding: 20,
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    padding: spacing.lg,
     alignItems: 'center',
+    ...shadows.card,
+  },
+  statCardWater: {
+    borderBottomWidth: 3,
+    borderBottomColor: colors.teal,
+  },
+  statCardShot: {
+    borderBottomWidth: 3,
+    borderBottomColor: colors.amber,
   },
   statEmoji: {
     fontSize: 28,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   statCount: {
+    fontFamily: fonts.heading,
     fontSize: 32,
-    fontWeight: '700',
-    color: '#1a1a1a',
+    color: colors.navy,
   },
   statLabel: {
-    fontSize: 13,
-    color: '#888',
+    ...typography.caption,
     marginTop: 2,
   },
-  pendingBanner: {
+  // Pending pings
+  sectionTitle: {
+    ...typography.h3,
+    marginBottom: spacing.md,
+  },
+  pingCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
+    ...shadows.card,
+  },
+  pingAccent: {
+    width: 4,
+  },
+  pingBody: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  pingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF5EB',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 20,
-    gap: 8,
+    marginBottom: 10,
   },
-  pendingText: {
+  pingEmoji: {
+    fontSize: 32,
+    marginRight: spacing.md,
+  },
+  pingInfo: {
     flex: 1,
-    fontSize: 14,
-    color: '#E67E22',
-    fontWeight: '500',
   },
-  sectionTitle: {
+  pingSender: {
+    fontFamily: fonts.bodySemiBold,
     fontSize: 17,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 12,
+    color: colors.navy,
   },
-  emptyCard: {
-    backgroundColor: '#F5F7FA',
-    borderRadius: 14,
-    padding: 24,
+  pingMeta: {
+    ...typography.caption,
+    marginTop: 2,
+  },
+  snoozedBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: 'rgba(232, 148, 90, 0.12)',
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    gap: spacing.xs,
   },
-  emptyCardText: {
+  snoozedBadgeText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.amber,
+  },
+  snoozeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(232, 148, 90, 0.08)',
+    borderRadius: radii.sm,
+    padding: spacing.sm,
+    marginBottom: 10,
+    gap: 6,
+  },
+  snoozeInfoText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: colors.amber,
+  },
+  noteContainer: {
+    backgroundColor: colors.bg,
+    borderRadius: radii.sm,
+    padding: 10,
+    marginBottom: spacing.md,
+  },
+  noteText: {
+    fontFamily: fonts.body,
     fontSize: 14,
-    color: '#888',
-    textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 20,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
-  shareCodeButton: {
-    backgroundColor: '#4A90D9',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
-  shareCodeButtonText: {
+  acceptButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.success,
+    borderRadius: radii.md,
+    paddingVertical: 12,
+    gap: spacing.xs,
+  },
+  acceptText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15,
+  },
+  snoozeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(232, 148, 90, 0.1)',
+    borderRadius: radii.md,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.amber,
+    gap: spacing.xs,
+  },
+  snoozeText: {
+    color: colors.amber,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15,
+  },
+  declineButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(224, 85, 85, 0.08)',
+    borderRadius: radii.md,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.error,
+    gap: spacing.xs,
+  },
+  declineText: {
+    color: colors.error,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15,
+  },
+  actionLoader: {
+    paddingVertical: 14,
+  },
+  // All caught up
+  allCaughtUp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(76, 175, 125, 0.08)',
+    borderRadius: radii.card,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  allCaughtUpText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 15,
+    color: colors.success,
+  },
+  // Quick Send
+  memberScroll: {
+    marginHorizontal: -spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  memberScrollContent: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
   },
   memberCard: {
-    flexDirection: 'row',
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    padding: spacing.md,
     alignItems: 'center',
-    backgroundColor: '#F5F7FA',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
+    width: 120,
+    ...shadows.card,
   },
   memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#4A90D9',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.lavender,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginBottom: spacing.sm,
   },
   memberInitial: {
     color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  memberName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1a1a1a',
-  },
-  quickSendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 6,
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-  },
-  quickSendEmoji: {
+    fontFamily: fonts.headingSemiBold,
     fontSize: 20,
   },
-  footerButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
+  memberName: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    color: colors.navy,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
-  footerButton: {
-    flex: 1,
+  quickSendRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  quickSendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickSendWater: {
+    backgroundColor: 'rgba(46, 196, 182, 0.12)',
+  },
+  quickSendShot: {
+    backgroundColor: 'rgba(232, 148, 90, 0.12)',
+  },
+  quickSendEmoji: {
+    fontSize: 18,
+  },
+  emptyCard: {
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    padding: spacing.lg,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    ...shadows.card,
+  },
+  emptyCardText: {
+    ...typography.caption,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  // Success banner
+  successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F0F4FA',
-    borderRadius: 10,
-    paddingVertical: 14,
-    gap: 6,
+    backgroundColor: colors.success,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    gap: spacing.sm,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
   },
-  footerButtonText: {
-    color: '#4A90D9',
-    fontSize: 15,
-    fontWeight: '600',
+  successBannerText: {
+    color: '#fff',
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 16,
   },
 });

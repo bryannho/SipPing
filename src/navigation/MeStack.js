@@ -1,27 +1,36 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StatsScreen } from '../screens/StatsScreen';
-import { DrinkLogScreen } from '../screens/DrinkLogScreen';
+import { MeScreen } from '../screens/MeScreen';
+import { TripDetailScreen } from '../screens/TripDetailScreen';
+import { CreateTripScreen } from '../screens/CreateTripScreen';
+import { JoinTripScreen } from '../screens/onboarding/JoinTripScreen';
 import { ScheduleRulesScreen } from '../screens/ScheduleRulesScreen';
 import { CreateScheduleRuleScreen } from '../screens/CreateScheduleRuleScreen';
-import { AccountScreen } from '../screens/AccountScreen';
 
 const Stack = createNativeStackNavigator();
 
-export function StatsStack() {
+export function MeStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen
-        name="Stats"
-        component={StatsScreen}
-        options={{ title: 'Trip Stats' }}
+        name="Me"
+        component={MeScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="DrinkLog"
-        component={DrinkLogScreen}
-        options={({ route }) => ({
-          title: route.params?.tripName ? `${route.params.tripName} Log` : 'Drink Log',
-        })}
+        name="TripDetail"
+        component={TripDetailScreen}
+        options={({ route }) => ({ title: route.params?.tripName || 'Trip' })}
+      />
+      <Stack.Screen
+        name="CreateTrip"
+        component={CreateTripScreen}
+        options={{ title: 'Create Trip' }}
+      />
+      <Stack.Screen
+        name="JoinTrip"
+        component={JoinTripScreen}
+        options={{ title: 'Join Trip' }}
       />
       <Stack.Screen
         name="ScheduleRules"
@@ -34,11 +43,6 @@ export function StatsStack() {
         options={({ route }) => ({
           title: route.params?.editRule ? 'Edit Schedule' : 'New Schedule',
         })}
-      />
-      <Stack.Screen
-        name="Account"
-        component={AccountScreen}
-        options={{ title: 'Account' }}
       />
     </Stack.Navigator>
   );
