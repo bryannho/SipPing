@@ -24,6 +24,7 @@ export function HomeScreen({ navigation }) {
   const [trips, setTrips] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [members, setMembers] = useState([]);
+  const [memberCount, setMemberCount] = useState(0);
   const [todayStats, setTodayStats] = useState({ water: 0, shot: 0 });
   const [pendingPings, setPendingPings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +34,20 @@ export function HomeScreen({ navigation }) {
   const [successMessage, setSuccessMessage] = useState(null);
   const successOpacity = useRef(new Animated.Value(0)).current;
   const [tripDropdownOpen, setTripDropdownOpen] = useState(false);
+  const [profile, setProfile] = useState(null);
+
+  // Fetch user profile name
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+      if (data) setProfile(data);
+    };
+    fetchProfile();
+  }, [user.id]);
 
   const fetchTrips = useCallback(async () => {
     const { data } = await supabase
@@ -100,6 +115,7 @@ export function HomeScreen({ navigation }) {
       ]);
 
       if (membersResult.data) {
+        setMemberCount(membersResult.data.length);
         setMembers(
           membersResult.data
             .map((m) => m.users)
@@ -246,11 +262,7 @@ export function HomeScreen({ navigation }) {
     setPendingPings((prev) => prev.filter((p) => p.id !== ping.id));
     setActionLoading(null);
 
-    const emoji = ping.type === 'water' ? '💧' : '🍾';
-    showSuccessBanner(`${emoji} Drink accepted!`);
-
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
+    // Offer photo upload first (before confirmation toast)
     const imageUrl = await pickAndUploadDrinkPhoto(user.id, ping.trip_id, ping.id);
     if (imageUrl && logEntry?.id) {
       await supabase
@@ -258,6 +270,9 @@ export function HomeScreen({ navigation }) {
         .update({ image_url: imageUrl })
         .eq('id', logEntry.id);
       showSuccessBanner('📸 Photo uploaded!');
+    } else {
+      const emoji = ping.type === 'water' ? '💧' : '🥃';
+      showSuccessBanner(`${emoji} Drink accepted!`);
     }
   };
 
@@ -399,21 +414,70 @@ export function HomeScreen({ navigation }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        {/* SipPing header with avatar */}
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>SipPing</Text>
+          <TouchableOpacity
+            style={styles.headerAvatar}
+            onPress={() => navigation.navigate('MeTab')}
+          >
+            <Text style={styles.headerAvatarText}>
+              {(profile?.name || user?.email || '?')[0].toUpperCase()}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Trip selector dropdown */}
-        <TouchableOpacity
-          style={styles.tripDropdown}
-          onPress={() => trips.length > 1 && setTripDropdownOpen(!tripDropdownOpen)}
-          activeOpacity={trips.length > 1 ? 0.7 : 1}
-        >
-          <Text style={styles.tripDropdownText}>{selectedTrip.name}</Text>
-          {trips.length > 1 && (
-            <Ionicons
-              name={tripDropdownOpen ? 'chevron-up' : 'chevron-down'}
-              size={20}
-              color={colors.textSecondary}
-            />
-          )}
-        </TouchableOpacity>
+        <View style={styles.tripDropdownRow}>
+          <TouchableOpacity
+            style={styles.tripDropdown}
+            onPress={() => trips.length > 1 && setTripDropdownOpen(!tripDropdownOpen)}
+            activeOpacity={trips.length > 1 ? 0.7 : 1}
+          >
+            <Text style={styles.tripIcon}>🌴</Text>
+            <View style={styles.tripDropdownTextContainer}>
+              <Text style={styles.tripDropdownText}>{selectedTrip.name}</Text>
+              {(selectedTrip.start_date || memberCount > 0) && (
+                <Text style={styles.tripSubtitle}>
+                  {selectedTrip.start_date && selectedTrip.end_date
+                    ? (() => {
+                        const start = new Date(selectedTrip.start_date);
+                        const end = new Date(selectedTrip.end_date);
+                        const now = new Date();
+                        const dayNum = Math.max(1, Math.floor((now - start) / (1000 * 60 * 60 * 24)) + 1);
+                        const totalDays = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                        return `Day ${dayNum} of ${totalDays}`;
+                      })()
+                    : ''}
+                  {selectedTrip.start_date && selectedTrip.end_date && memberCount > 0 ? ' · ' : ''}
+                  {memberCount > 0 ? `${memberCount} member${memberCount !== 1 ? 's' : ''}` : ''}
+                </Text>
+              )}
+            </View>
+            {trips.length > 1 && (
+              <Ionicons
+                name={tripDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={colors.textSecondary}
+              />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.tripInfoButton}
+            onPress={() =>
+              navigation.navigate('MeTab', {
+                screen: 'TripDetail',
+                params: {
+                  tripId: selectedTrip.id,
+                  tripName: selectedTrip.name,
+                  inviteCode: selectedTrip.invite_code,
+                },
+              })
+            }
+          >
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
 
         {tripDropdownOpen && trips.length > 1 && (
           <View style={styles.tripDropdownMenu}>
@@ -451,12 +515,12 @@ export function HomeScreen({ navigation }) {
         <View style={styles.statsRow}>
           <View style={[styles.statCard, styles.statCardWater]}>
             <Text style={styles.statEmoji}>💧</Text>
-            <Text style={styles.statCount}>{todayStats.water}</Text>
+            <Text style={[styles.statCount, styles.statCountWater]}>{todayStats.water}</Text>
             <Text style={styles.statLabel}>Waters today</Text>
           </View>
           <View style={[styles.statCard, styles.statCardShot]}>
-            <Text style={styles.statEmoji}>🍾</Text>
-            <Text style={styles.statCount}>{todayStats.shot}</Text>
+            <Text style={styles.statEmoji}>🥃</Text>
+            <Text style={[styles.statCount, styles.statCountShot]}>{todayStats.shot}</Text>
             <Text style={styles.statLabel}>Shots today</Text>
           </View>
         </View>
@@ -470,7 +534,7 @@ export function HomeScreen({ navigation }) {
             {pendingPings.map((ping) => {
               const isActioning = actionLoading === ping.id;
               const isSnoozed = ping.status === 'snoozed';
-              const emoji = ping.type === 'water' ? '💧' : '🍾';
+              const emoji = ping.type === 'water' ? '💧' : '🥃';
               const senderName = ping.sender?.name || ping.sender?.email || 'Someone';
               const accentColor = ping.type === 'water' ? colors.teal : colors.amber;
 
@@ -592,13 +656,29 @@ export function HomeScreen({ navigation }) {
                     style={[styles.quickSendBtn, styles.quickSendShot]}
                     onPress={() => handleQuickSend(member, 'shot')}
                   >
-                    <Text style={styles.quickSendEmoji}>🍾</Text>
+                    <Text style={styles.quickSendEmoji}>🥃</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ))}
           </ScrollView>
         )}
+
+        {/* New Trip / Join Trip buttons */}
+        <View style={styles.tripButtonsRow}>
+          <TouchableOpacity
+            style={styles.outlineButton}
+            onPress={() => navigation.navigate('MeTab', { screen: 'CreateTrip' })}
+          >
+            <Text style={styles.outlineButtonText}>+ New Trip</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.outlineButton}
+            onPress={() => navigation.navigate('MeTab', { screen: 'JoinTrip' })}
+          >
+            <Text style={styles.outlineButtonText}>Join Trip</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -659,20 +739,71 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     fontSize: 16,
   },
-  // Trip dropdown
-  tripDropdown: {
+  // Header
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  headerTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 28,
+    color: colors.cta,
+  },
+  headerAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.cta,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerAvatarText: {
+    color: '#fff',
+    fontFamily: fonts.headingSemiBold,
+    fontSize: 15,
+  },
+  // Trip dropdown
+  tripDropdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  tripDropdown: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.card,
     borderRadius: radii.card,
     padding: spacing.md,
-    marginBottom: spacing.md,
     ...shadows.card,
+  },
+  tripIcon: {
+    fontSize: 20,
+    marginRight: spacing.sm,
+  },
+  tripDropdownTextContainer: {
+    flex: 1,
   },
   tripDropdownText: {
     ...typography.h2,
-    flex: 1,
+  },
+  tripSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  tripInfoButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.card,
   },
   tripDropdownMenu: {
     backgroundColor: colors.card,
@@ -715,12 +846,10 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   statCardWater: {
-    borderBottomWidth: 3,
-    borderBottomColor: colors.teal,
+    backgroundColor: '#E6F9F7',
   },
   statCardShot: {
-    borderBottomWidth: 3,
-    borderBottomColor: colors.amber,
+    backgroundColor: '#FFF0E5',
   },
   statEmoji: {
     fontSize: 28,
@@ -730,6 +859,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heading,
     fontSize: 32,
     color: colors.navy,
+  },
+  statCountWater: {
+    color: '#1A9E92',
+  },
+  statCountShot: {
+    color: '#C47538',
   },
   statLabel: {
     ...typography.caption,
@@ -958,6 +1093,27 @@ const styles = StyleSheet.create({
     ...typography.caption,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  // Trip buttons
+  tripButtonsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  outlineButton: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: colors.navy,
+    borderRadius: radii.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outlineButtonText: {
+    color: colors.navy,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15,
   },
   // Success banner
   successBanner: {

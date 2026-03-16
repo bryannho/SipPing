@@ -233,6 +233,9 @@ export function MeScreen({ navigation }) {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
+      {/* Title */}
+      <Text style={styles.screenTitle}>Me</Text>
+
       {/* Profile */}
       <View style={styles.profileSection}>
         <TouchableOpacity onPress={handleChangeAvatar} disabled={savingAvatar}>
@@ -342,9 +345,11 @@ export function MeScreen({ navigation }) {
                 <Text style={styles.tripRowName} numberOfLines={1}>
                   {trip.name}
                 </Text>
-                {trip.end_date && (
+                {trip.start_date && (
                   <Text style={styles.tripRowDate}>
-                    {trip.start_date} – {trip.end_date}
+                    {trip.end_date
+                      ? `${trip.start_date} – ${trip.end_date}`
+                      : `Started ${trip.start_date}`}
                   </Text>
                 )}
               </View>
@@ -403,7 +408,7 @@ export function MeScreen({ navigation }) {
             const otherName = isSender
               ? rule.recipient?.name || rule.recipient?.email || 'Unknown'
               : rule.sender?.name || rule.sender?.email || 'Unknown';
-            const emoji = rule.type === 'water' ? '💧' : '🍾';
+            const emoji = rule.type === 'water' ? '💧' : '🥃';
 
             return (
               <View key={rule.id} style={styles.scheduleRow}>
@@ -430,7 +435,7 @@ export function MeScreen({ navigation }) {
 
       {/* Account */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={[styles.sectionTitle, { marginBottom: spacing.md }]}>Account</Text>
 
         <TouchableOpacity style={styles.accountRow} onPress={signOut}>
           <Ionicons name="log-out-outline" size={22} color={colors.navy} />
@@ -469,6 +474,10 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingTop: 60,
     paddingBottom: 60,
+  },
+  screenTitle: {
+    ...typography.h1,
+    marginBottom: spacing.lg,
   },
   // Profile
   profileSection: {

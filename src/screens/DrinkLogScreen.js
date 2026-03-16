@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -64,7 +65,6 @@ export function DrinkLogScreen({ route }) {
     const rows = data || [];
     setLogs(rows);
 
-    // Generate signed URLs for any logs with photos
     const photoPaths = rows
       .filter((l) => l.image_url)
       .map((l) => l.image_url);
@@ -108,25 +108,6 @@ export function DrinkLogScreen({ route }) {
     setRefreshing(false);
   };
 
-  const formatDateTime = (dateStr) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday = date.toDateString() === yesterday.toDateString();
-
-    const timeStr = date.toLocaleTimeString([], {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-
-    if (isToday) return `Today, ${timeStr}`;
-    if (isYesterday) return `Yesterday, ${timeStr}`;
-    return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
-  };
-
   // Group logs by date
   const groupedLogs = [];
   let currentDate = null;
@@ -165,7 +146,7 @@ export function DrinkLogScreen({ route }) {
       );
     }
 
-    const emoji = item.type === 'shot' ? '🍾' : '💧';
+    const emoji = item.type === 'shot' ? '🥃' : '💧';
     const userName = item.user?.name || item.user?.email || 'Unknown';
     const isCurrentUser = item.user_id === user.id;
     const timeStr = new Date(item.logged_at).toLocaleTimeString([], {
@@ -211,7 +192,7 @@ export function DrinkLogScreen({ route }) {
             <Ionicons
               name="camera"
               size={18}
-              color="#4A90D9"
+              color={colors.cta}
               style={styles.photoIcon}
             />
           </TouchableOpacity>
@@ -223,7 +204,7 @@ export function DrinkLogScreen({ route }) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4A90D9" />
+        <ActivityIndicator size="large" color={colors.cta} />
       </View>
     );
   }
@@ -270,7 +251,7 @@ export function DrinkLogScreen({ route }) {
           <Text style={styles.summaryText}>
             💧 {logs.filter((l) => l.type === 'water').length} waters
             {'  '}·{'  '}
-            🍾 {logs.filter((l) => l.type === 'shot').length} shots
+            🥃 {logs.filter((l) => l.type === 'shot').length} shots
             {'  '}·{'  '}
             {logs.length} total
           </Text>
@@ -289,7 +270,7 @@ export function DrinkLogScreen({ route }) {
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={64} color="#ccc" />
+            <Ionicons name="document-text-outline" size={64} color={colors.textTertiary} />
             <Text style={styles.emptyTitle}>No Drinks Logged</Text>
             <Text style={styles.emptySubtitle}>
               Accept some pings to see your drink history here.
@@ -315,7 +296,7 @@ export function DrinkLogScreen({ route }) {
           {viewingImage && (
             imageError ? (
               <View style={styles.imageErrorContainer}>
-                <Ionicons name="image-outline" size={48} color="#888" />
+                <Ionicons name="image-outline" size={48} color={colors.textSecondary} />
                 <Text style={styles.imageErrorText}>Failed to load image</Text>
               </View>
             ) : (
@@ -349,140 +330,137 @@ export function DrinkLogScreen({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
   },
   tripSelector: {
     maxHeight: 52,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   tripSelectorContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.md,
     paddingVertical: 10,
   },
   tripTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F0F0F0',
-    marginRight: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.card,
+    marginRight: spacing.sm,
   },
   tripTabActive: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.cta,
   },
   tripTabText: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
+    color: colors.textSecondary,
   },
   tripTabTextActive: {
     color: '#fff',
   },
   summaryBar: {
-    backgroundColor: '#F5F7FA',
+    backgroundColor: colors.card,
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   summaryText: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 13,
-    color: '#888',
+    color: colors.textSecondary,
     textAlign: 'center',
-    fontWeight: '500',
   },
   listContent: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: spacing.md,
+    paddingBottom: spacing.xl,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: spacing.xl,
   },
   emptyState: {
     alignItems: 'center',
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginTop: 16,
-    marginBottom: 6,
+    ...typography.h2,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
   emptySubtitle: {
-    fontSize: 15,
-    color: '#888',
+    ...typography.caption,
     textAlign: 'center',
   },
   dateHeader: {
-    paddingVertical: 8,
-    marginTop: 8,
-    marginBottom: 4,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
   },
   dateHeaderText: {
+    fontFamily: fonts.headingMedium,
     fontSize: 14,
-    fontWeight: '600',
-    color: '#888',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   logRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F7FA',
-    borderRadius: 12,
+    backgroundColor: colors.card,
+    borderRadius: radii.md,
     padding: 14,
     marginBottom: 6,
+    ...shadows.card,
   },
   logEmoji: {
     fontSize: 24,
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   logInfo: {
     flex: 1,
   },
   logUser: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 15,
-    fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.navy,
   },
   logTime: {
-    fontSize: 13,
-    color: '#888',
+    ...typography.caption,
     marginTop: 1,
   },
   typeBadge: {
-    borderRadius: 8,
+    borderRadius: radii.sm,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   typeBadgeWater: {
-    backgroundColor: '#EBF5FB',
+    backgroundColor: 'rgba(46, 196, 182, 0.12)',
   },
   typeBadgeShot: {
-    backgroundColor: '#FFF5EB',
+    backgroundColor: 'rgba(232, 148, 90, 0.12)',
   },
   typeBadgeText: {
+    fontFamily: fonts.bodySemiBold,
     fontSize: 12,
-    fontWeight: '600',
     textTransform: 'capitalize',
   },
   typeBadgeTextWater: {
-    color: '#4A90D9',
+    color: colors.teal,
   },
   typeBadgeTextShot: {
-    color: '#E67E22',
+    color: colors.amber,
   },
   photoIcon: {
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
   modalOverlay: {
     flex: 1,
@@ -499,7 +477,7 @@ const styles = StyleSheet.create({
   fullImage: {
     width: SCREEN_WIDTH - 32,
     height: SCREEN_WIDTH - 32,
-    borderRadius: 8,
+    borderRadius: radii.sm,
   },
   imageLoader: {
     position: 'absolute',
@@ -509,7 +487,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   imageErrorText: {
-    color: '#888',
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
     fontSize: 15,
     marginTop: 10,
   },

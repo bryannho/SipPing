@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { statusCodes } from '@react-native-google-signin/google-signin';
+import { colors, fonts, radii, spacing, typography } from '../../theme';
 
 export function SignUpScreen({ navigation }) {
   const { signUp, signInWithGoogle } = useAuth();
@@ -74,6 +75,7 @@ export function SignUpScreen({ navigation }) {
         <TextInput
           style={styles.input}
           placeholder="Email"
+          placeholderTextColor={colors.textTertiary}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -83,6 +85,7 @@ export function SignUpScreen({ navigation }) {
         <TextInput
           style={styles.input}
           placeholder="Password"
+          placeholderTextColor={colors.textTertiary}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -91,6 +94,7 @@ export function SignUpScreen({ navigation }) {
         <TextInput
           style={styles.input}
           placeholder="Confirm Password"
+          placeholderTextColor={colors.textTertiary}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
@@ -118,7 +122,7 @@ export function SignUpScreen({ navigation }) {
           onPress={handleGoogleSignIn}
           disabled={googleLoading}
         >
-          <Ionicons name="logo-google" size={20} color="#1a1a1a" />
+          <Ionicons name="logo-google" size={20} color={colors.navy} />
           <Text style={styles.googleButtonText}>
             {googleLoading ? 'Signing in...' : 'Sign in with Google'}
           </Text>
@@ -137,49 +141,52 @@ export function SignUpScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
   },
   inner: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: spacing.xl,
   },
   title: {
+    fontFamily: fonts.heading,
     fontSize: 30,
-    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 4,
-    color: '#1a1a1a',
+    marginBottom: spacing.xs,
+    color: colors.navy,
   },
   subtitle: {
+    fontFamily: fonts.body,
     fontSize: 16,
     textAlign: 'center',
-    color: '#888',
+    color: colors.textSecondary,
     marginBottom: 40,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: radii.md,
     padding: 14,
+    fontFamily: fonts.body,
     fontSize: 16,
+    color: colors.navy,
     marginBottom: 14,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.card,
   },
   button: {
-    backgroundColor: '#4A90D9',
-    borderRadius: 10,
+    backgroundColor: colors.cta,
+    borderRadius: radii.md,
     padding: 16,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
     color: '#fff',
+    fontFamily: fonts.bodySemiBold,
     fontSize: 17,
-    fontWeight: '600',
   },
   divider: {
     flexDirection: 'row',
@@ -189,11 +196,12 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#ddd',
+    backgroundColor: colors.border,
   },
   dividerText: {
-    marginHorizontal: 16,
-    color: '#888',
+    marginHorizontal: spacing.md,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
     fontSize: 14,
   },
   googleButton: {
@@ -201,25 +209,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: radii.md,
     padding: 16,
     gap: 10,
     marginBottom: 20,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
   },
   googleButtonText: {
+    fontFamily: fonts.bodySemiBold,
     fontSize: 17,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    color: colors.navy,
   },
   link: {
     textAlign: 'center',
-    color: '#888',
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
     fontSize: 14,
   },
   linkBold: {
-    color: '#4A90D9',
-    fontWeight: '600',
+    color: colors.cta,
+    fontFamily: fonts.bodySemiBold,
   },
 });

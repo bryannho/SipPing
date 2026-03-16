@@ -14,6 +14,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { sendDrinkPingNotification } from '../utils/pushNotifications';
 import { playSendSound } from '../utils/sounds';
+import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 const SCHEDULE_OPTIONS = [
   { label: 'Now', value: 0 },
@@ -34,14 +35,12 @@ export function SendScreen({ route, navigation }) {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Apply params from quick-send
   useEffect(() => {
     if (route.params?.tripId) setSelectedTripId(route.params.tripId);
     if (route.params?.toUserId) setSelectedUserId(route.params.toUserId);
     if (route.params?.drinkType) setDrinkType(route.params.drinkType);
   }, [route.params]);
 
-  // Fetch user's active trips
   useEffect(() => {
     const fetchTrips = async () => {
       const { data } = await supabase
@@ -64,7 +63,6 @@ export function SendScreen({ route, navigation }) {
     fetchTrips();
   }, [user.id]);
 
-  // Fetch members when trip changes
   useEffect(() => {
     if (!selectedTripId) return;
 
@@ -80,7 +78,6 @@ export function SendScreen({ route, navigation }) {
 
       setMembers(otherMembers);
 
-      // Auto-select if only one member or if pre-selected
       if (
         otherMembers.length === 1 &&
         !route.params?.toUserId
@@ -128,7 +125,6 @@ export function SendScreen({ route, navigation }) {
       return;
     }
 
-    // Send push notification immediately only if not scheduled
     const recipient = members.find((m) => m.id === selectedUserId);
     if (!scheduledAt && recipient?.expo_push_token) {
       const { data: senderProfile } = await supabase
@@ -148,7 +144,7 @@ export function SendScreen({ route, navigation }) {
     setSending(false);
     await playSendSound();
 
-    const emoji = drinkType === 'water' ? '💧' : '🍾';
+    const emoji = drinkType === 'water' ? '💧' : '🥃';
     const recipientName = recipient?.name || recipient?.email || 'them';
     const scheduleMsg = scheduledAt
       ? ` (scheduled for ${scheduleDelay >= 60 ? `${scheduleDelay / 60}h` : `${scheduleDelay}m`} from now)`
@@ -159,7 +155,6 @@ export function SendScreen({ route, navigation }) {
         onPress: () => {
           setNote('');
           setScheduleDelay(0);
-          // Clear params so screen resets on next visit
           navigation.setParams({
             tripId: undefined,
             toUserId: undefined,
@@ -174,7 +169,7 @@ export function SendScreen({ route, navigation }) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4A90D9" />
+        <ActivityIndicator size="large" color={colors.cta} />
       </View>
     );
   }
@@ -182,7 +177,7 @@ export function SendScreen({ route, navigation }) {
   if (trips.length === 0) {
     return (
       <View style={styles.centered}>
-        <Ionicons name="airplane-outline" size={48} color="#ccc" />
+        <Ionicons name="airplane-outline" size={48} color={colors.textTertiary} />
         <Text style={styles.emptyText}>
           Join or create a trip first to send pings.
         </Text>
@@ -190,12 +185,20 @@ export function SendScreen({ route, navigation }) {
     );
   }
 
+  const selectedTrip = trips.find((t) => t.id === selectedTripId) || trips[0];
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
     >
+      {/* Screen title */}
+      <Text style={styles.screenTitle}>Send a Ping</Text>
+      {selectedTrip && (
+        <Text style={styles.screenSubtitle}>{selectedTrip.name}</Text>
+      )}
+
       {/* Trip selector */}
       {trips.length > 1 && (
         <View style={styles.section}>
@@ -263,7 +266,7 @@ export function SendScreen({ route, navigation }) {
                 {member.name || member.email}
               </Text>
               {member.id === selectedUserId && (
-                <Ionicons name="checkmark-circle" size={22} color="#4A90D9" />
+                <Ionicons name="checkmark-circle" size={22} color={colors.cta} />
               )}
             </TouchableOpacity>
           ))
@@ -277,7 +280,7 @@ export function SendScreen({ route, navigation }) {
           <TouchableOpacity
             style={[
               styles.typeCard,
-              drinkType === 'water' && styles.typeCardActive,
+              drinkType === 'water' && styles.typeCardWaterActive,
             ]}
             onPress={() => setDrinkType('water')}
           >
@@ -285,7 +288,7 @@ export function SendScreen({ route, navigation }) {
             <Text
               style={[
                 styles.typeText,
-                drinkType === 'water' && styles.typeTextActive,
+                drinkType === 'water' && styles.typeTextWaterActive,
               ]}
             >
               Water
@@ -294,15 +297,15 @@ export function SendScreen({ route, navigation }) {
           <TouchableOpacity
             style={[
               styles.typeCard,
-              drinkType === 'shot' && styles.typeCardActive,
+              drinkType === 'shot' && styles.typeCardShotActive,
             ]}
             onPress={() => setDrinkType('shot')}
           >
-            <Text style={styles.typeEmoji}>🍾</Text>
+            <Text style={styles.typeEmoji}>🥃</Text>
             <Text
               style={[
                 styles.typeText,
-                drinkType === 'shot' && styles.typeTextActive,
+                drinkType === 'shot' && styles.typeTextShotActive,
               ]}
             >
               Shot
@@ -317,6 +320,7 @@ export function SendScreen({ route, navigation }) {
         <TextInput
           style={styles.noteInput}
           placeholder="Stay hydrated! 🤙"
+          placeholderTextColor={colors.textTertiary}
           value={note}
           onChangeText={setNote}
           maxLength={200}
@@ -367,8 +371,8 @@ export function SendScreen({ route, navigation }) {
           {sending
             ? 'Sending...'
             : scheduleDelay > 0
-              ? `Schedule ${drinkType === 'water' ? '💧' : '🍾'} Ping`
-              : `Send ${drinkType === 'water' ? '💧' : '🍾'} Ping`}
+              ? `Schedule ${drinkType === 'water' ? '💧' : '🥃'} Ping`
+              : `Send ${drinkType === 'water' ? '💧' : '🥃'} Ping`}
         </Text>
       </TouchableOpacity>
     </ScrollView>
@@ -378,178 +382,197 @@ export function SendScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
   },
   scrollContent: {
-    padding: 20,
+    padding: spacing.lg,
     paddingBottom: 40,
+  },
+  screenTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 28,
+    color: colors.navy,
+    marginBottom: spacing.xs,
+  },
+  screenSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: 15,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 32,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.xl,
   },
   emptyText: {
-    fontSize: 15,
-    color: '#888',
+    ...typography.caption,
     textAlign: 'center',
-    marginTop: 12,
+    marginTop: spacing.md,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    ...typography.label,
     marginBottom: 10,
   },
   chip: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.md,
     paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F0F0F0',
-    marginRight: 8,
+    borderRadius: radii.pill,
+    backgroundColor: colors.card,
+    marginRight: spacing.sm,
+    ...shadows.card,
   },
   chipActive: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.cta,
   },
   chipText: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 15,
-    fontWeight: '500',
-    color: '#666',
+    color: colors.textSecondary,
   },
   chipTextActive: {
     color: '#fff',
   },
   noMembers: {
+    fontFamily: fonts.body,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textTertiary,
     fontStyle: 'italic',
   },
   personRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#F5F7FA',
-    marginBottom: 8,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.card,
+    marginBottom: spacing.sm,
+    ...shadows.card,
   },
   personRowActive: {
-    backgroundColor: '#EBF2FA',
     borderWidth: 1.5,
-    borderColor: '#4A90D9',
+    borderColor: colors.cta,
   },
   personAvatar: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#ccc',
+    backgroundColor: colors.textTertiary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   personAvatarActive: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.lavender,
   },
   personInitial: {
     color: '#fff',
+    fontFamily: fonts.bodySemiBold,
     fontSize: 16,
-    fontWeight: '600',
   },
   personName: {
     flex: 1,
+    fontFamily: fonts.bodyMedium,
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.navy,
   },
   personNameActive: {
-    color: '#4A90D9',
+    color: colors.cta,
   },
   typeRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
   },
   typeCard: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 20,
-    borderRadius: 14,
-    backgroundColor: '#F5F7FA',
+    borderRadius: radii.card,
+    backgroundColor: colors.card,
     borderWidth: 2,
     borderColor: 'transparent',
+    ...shadows.card,
   },
-  typeCardActive: {
-    borderColor: '#4A90D9',
-    backgroundColor: '#EBF2FA',
+  typeCardWaterActive: {
+    borderColor: colors.teal,
+    backgroundColor: 'rgba(46, 196, 182, 0.08)',
+  },
+  typeCardShotActive: {
+    borderColor: colors.amber,
+    backgroundColor: 'rgba(232, 148, 90, 0.08)',
   },
   typeEmoji: {
     fontSize: 36,
     marginBottom: 6,
   },
   typeText: {
+    fontFamily: fonts.bodySemiBold,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
+    color: colors.textSecondary,
   },
-  typeTextActive: {
-    color: '#4A90D9',
+  typeTextWaterActive: {
+    color: colors.teal,
+  },
+  typeTextShotActive: {
+    color: colors.amber,
   },
   noteInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: radii.md,
     padding: 14,
+    fontFamily: fonts.body,
     fontSize: 15,
-    backgroundColor: '#fafafa',
+    color: colors.navy,
+    backgroundColor: colors.card,
     minHeight: 60,
     textAlignVertical: 'top',
   },
   scheduleRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
   },
   scheduleChip: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#F5F7FA',
+    borderRadius: radii.md,
+    backgroundColor: colors.card,
     alignItems: 'center',
+    ...shadows.card,
   },
   scheduleChipActive: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.cta,
   },
   scheduleChipText: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
+    color: colors.textSecondary,
   },
   scheduleChipTextActive: {
     color: '#fff',
   },
   scheduleNote: {
-    fontSize: 13,
-    color: '#888',
-    marginTop: 8,
+    ...typography.caption,
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
   sendButton: {
-    backgroundColor: '#4A90D9',
-    borderRadius: 12,
+    backgroundColor: colors.cta,
+    borderRadius: radii.md,
     padding: 18,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   sendButtonDisabled: {
     opacity: 0.6,
   },
   sendButtonText: {
     color: '#fff',
+    fontFamily: fonts.heading,
     fontSize: 18,
-    fontWeight: '700',
   },
 });

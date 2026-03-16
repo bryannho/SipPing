@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 export function ScheduleRulesScreen({ route, navigation }) {
   const { user } = useAuth();
@@ -126,7 +127,6 @@ export function ScheduleRulesScreen({ route, navigation }) {
   };
 
   const formatTime = (timeStr) => {
-    // timeStr is "HH:MM" or "HH:MM:SS"
     const [h, m] = timeStr.split(':').map(Number);
     const ampm = h >= 12 ? 'PM' : 'AM';
     const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
@@ -145,7 +145,7 @@ export function ScheduleRulesScreen({ route, navigation }) {
     const otherName = isSender
       ? item.recipient?.name || item.recipient?.email || 'Unknown'
       : item.sender?.name || item.sender?.email || 'Unknown';
-    const emoji = item.type === 'water' ? '💧' : '🍾';
+    const emoji = item.type === 'water' ? '💧' : '🥃';
     const directionText = isSender ? `→ ${otherName}` : `← ${otherName}`;
 
     return (
@@ -167,8 +167,8 @@ export function ScheduleRulesScreen({ route, navigation }) {
           <Switch
             value={item.active}
             onValueChange={() => toggleActive(item)}
-            trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
-            thumbColor={item.active ? '#4A90D9' : '#f4f3f4'}
+            trackColor={{ false: '#D1D5DB', true: 'rgba(255, 107, 107, 0.3)' }}
+            thumbColor={item.active ? colors.cta : '#f4f3f4'}
           />
         </View>
 
@@ -183,15 +183,15 @@ export function ScheduleRulesScreen({ route, navigation }) {
                 })
               }
             >
-              <Ionicons name="pencil-outline" size={16} color="#4A90D9" />
+              <Ionicons name="pencil-outline" size={16} color={colors.cta} />
               <Text style={styles.ruleActionText}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.ruleActionBtn}
               onPress={() => deleteRule(item)}
             >
-              <Ionicons name="trash-outline" size={16} color="#E74C3C" />
-              <Text style={[styles.ruleActionText, { color: '#E74C3C' }]}>
+              <Ionicons name="trash-outline" size={16} color={colors.error} />
+              <Text style={[styles.ruleActionText, { color: colors.error }]}>
                 Delete
               </Text>
             </TouchableOpacity>
@@ -204,7 +204,7 @@ export function ScheduleRulesScreen({ route, navigation }) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4A90D9" />
+        <ActivityIndicator size="large" color={colors.cta} />
       </View>
     );
   }
@@ -212,7 +212,7 @@ export function ScheduleRulesScreen({ route, navigation }) {
   if (trips.length === 0) {
     return (
       <View style={styles.centered}>
-        <Ionicons name="timer-outline" size={64} color="#ccc" />
+        <Ionicons name="timer-outline" size={64} color={colors.textTertiary} />
         <Text style={styles.emptyTitle}>No Active Trips</Text>
         <Text style={styles.emptySubtitle}>
           Join or create a trip to set up schedules.
@@ -269,7 +269,7 @@ export function ScheduleRulesScreen({ route, navigation }) {
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="timer-outline" size={64} color="#ccc" />
+            <Ionicons name="timer-outline" size={64} color={colors.textTertiary} />
             <Text style={styles.emptyTitle}>No Schedules</Text>
             <Text style={styles.emptySubtitle}>
               Set up recurring pings to keep your crew hydrated automatically.
@@ -296,72 +296,70 @@ export function ScheduleRulesScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 32,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.xl,
   },
   tripSelector: {
     maxHeight: 52,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   tripSelectorContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.md,
     paddingVertical: 10,
   },
   tripTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F0F0F0',
-    marginRight: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.card,
+    marginRight: spacing.sm,
   },
   tripTabActive: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.cta,
   },
   tripTabText: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
+    color: colors.textSecondary,
   },
   tripTabTextActive: {
     color: '#fff',
   },
   listContent: {
-    padding: 16,
+    padding: spacing.md,
     paddingBottom: 100,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: spacing.xl,
   },
   emptyState: {
     alignItems: 'center',
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginTop: 16,
-    marginBottom: 6,
+    ...typography.h2,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
   emptySubtitle: {
-    fontSize: 15,
-    color: '#888',
+    ...typography.caption,
     textAlign: 'center',
   },
   ruleCard: {
-    backgroundColor: '#F5F7FA',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.card,
   },
   ruleCardInactive: {
     opacity: 0.5,
@@ -372,43 +370,43 @@ const styles = StyleSheet.create({
   },
   ruleEmoji: {
     fontSize: 28,
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   ruleInfo: {
     flex: 1,
   },
   ruleTitle: {
+    fontFamily: fonts.bodySemiBold,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    color: colors.navy,
   },
   ruleSchedule: {
-    fontSize: 14,
-    color: '#888',
+    ...typography.caption,
     marginTop: 2,
   },
   ruleTimezone: {
+    fontFamily: fonts.body,
     fontSize: 12,
-    color: '#aaa',
+    color: colors.textTertiary,
     marginTop: 1,
   },
   ruleActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#E8E8E8',
-    marginTop: 12,
+    borderTopColor: colors.border,
+    marginTop: spacing.md,
     paddingTop: 10,
-    gap: 16,
+    gap: spacing.md,
   },
   ruleActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xs,
   },
   ruleActionText: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 14,
-    fontWeight: '500',
-    color: '#4A90D9',
+    color: colors.cta,
   },
   fab: {
     position: 'absolute',
@@ -417,13 +415,9 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.cta,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    ...shadows.cardLg,
   },
 });

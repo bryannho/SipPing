@@ -8,11 +8,11 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 const INTERVAL_OPTIONS = [
   { label: '30 min', value: 30 },
@@ -49,7 +49,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
   );
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showTimePicker, setShowTimePicker] = useState(null); // 'start' | 'end' | null
+  const [showTimePicker, setShowTimePicker] = useState(null);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -145,7 +145,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4A90D9" />
+        <ActivityIndicator size="large" color={colors.cta} />
       </View>
     );
   }
@@ -190,7 +190,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
                 {member.name || member.email}
               </Text>
               {member.id === selectedUserId && (
-                <Ionicons name="checkmark-circle" size={22} color="#4A90D9" />
+                <Ionicons name="checkmark-circle" size={22} color={colors.cta} />
               )}
             </TouchableOpacity>
           ))
@@ -204,7 +204,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
           <TouchableOpacity
             style={[
               styles.typeCard,
-              drinkType === 'water' && styles.typeCardActive,
+              drinkType === 'water' && styles.typeCardWaterActive,
             ]}
             onPress={() => setDrinkType('water')}
           >
@@ -212,7 +212,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
             <Text
               style={[
                 styles.typeText,
-                drinkType === 'water' && styles.typeTextActive,
+                drinkType === 'water' && styles.typeTextWaterActive,
               ]}
             >
               Water
@@ -221,15 +221,15 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
           <TouchableOpacity
             style={[
               styles.typeCard,
-              drinkType === 'shot' && styles.typeCardActive,
+              drinkType === 'shot' && styles.typeCardShotActive,
             ]}
             onPress={() => setDrinkType('shot')}
           >
-            <Text style={styles.typeEmoji}>🍾</Text>
+            <Text style={styles.typeEmoji}>🥃</Text>
             <Text
               style={[
                 styles.typeText,
-                drinkType === 'shot' && styles.typeTextActive,
+                drinkType === 'shot' && styles.typeTextShotActive,
               ]}
             >
               Shot
@@ -252,7 +252,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
           <Ionicons
             name="arrow-forward"
             size={20}
-            color="#ccc"
+            color={colors.textTertiary}
             style={styles.timeArrow}
           />
           <TouchableOpacity
@@ -294,7 +294,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
 
       {/* Summary */}
       <View style={styles.summaryCard}>
-        <Ionicons name="information-circle-outline" size={18} color="#4A90D9" />
+        <Ionicons name="information-circle-outline" size={18} color={colors.cta} />
         <Text style={styles.summaryText}>
           This will send a {drinkType} ping every {intervalMinutes < 60 ? `${intervalMinutes} minutes` : `${intervalMinutes / 60} hour${intervalMinutes > 60 ? 's' : ''}`} between{' '}
           {formatHour(startHour)} and {formatHour(endHour)}.
@@ -360,7 +360,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
                       <Ionicons
                         name="checkmark"
                         size={20}
-                        color="#4A90D9"
+                        color={colors.cta}
                       />
                     )}
                   </TouchableOpacity>
@@ -377,151 +377,160 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
   },
   scrollContent: {
-    padding: 20,
+    padding: spacing.lg,
     paddingBottom: 40,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    ...typography.label,
     marginBottom: 10,
   },
   noMembers: {
+    fontFamily: fonts.body,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textTertiary,
     fontStyle: 'italic',
   },
   personRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#F5F7FA',
-    marginBottom: 8,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.card,
+    marginBottom: spacing.sm,
+    ...shadows.card,
   },
   personRowActive: {
-    backgroundColor: '#EBF2FA',
     borderWidth: 1.5,
-    borderColor: '#4A90D9',
+    borderColor: colors.cta,
   },
   personAvatar: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#ccc',
+    backgroundColor: colors.textTertiary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   personAvatarActive: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.lavender,
   },
   personInitial: {
     color: '#fff',
+    fontFamily: fonts.bodySemiBold,
     fontSize: 16,
-    fontWeight: '600',
   },
   personName: {
     flex: 1,
+    fontFamily: fonts.bodyMedium,
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.navy,
   },
   personNameActive: {
-    color: '#4A90D9',
+    color: colors.cta,
   },
   typeRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
   },
   typeCard: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 20,
-    borderRadius: 14,
-    backgroundColor: '#F5F7FA',
+    borderRadius: radii.card,
+    backgroundColor: colors.card,
     borderWidth: 2,
     borderColor: 'transparent',
+    ...shadows.card,
   },
-  typeCardActive: {
-    borderColor: '#4A90D9',
-    backgroundColor: '#EBF2FA',
+  typeCardWaterActive: {
+    borderColor: colors.teal,
+    backgroundColor: 'rgba(46, 196, 182, 0.08)',
+  },
+  typeCardShotActive: {
+    borderColor: colors.amber,
+    backgroundColor: 'rgba(232, 148, 90, 0.08)',
   },
   typeEmoji: {
     fontSize: 36,
     marginBottom: 6,
   },
   typeText: {
+    fontFamily: fonts.bodySemiBold,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
+    color: colors.textSecondary,
   },
-  typeTextActive: {
-    color: '#4A90D9',
+  typeTextWaterActive: {
+    color: colors.teal,
+  },
+  typeTextShotActive: {
+    color: colors.amber,
   },
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.md,
   },
   timeButton: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.card,
+    borderRadius: radii.md,
+    padding: spacing.md,
     alignItems: 'center',
+    ...shadows.card,
   },
   timeLabel: {
+    fontFamily: fonts.body,
     fontSize: 12,
-    color: '#888',
-    marginBottom: 4,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
   timeValue: {
+    fontFamily: fonts.bodySemiBold,
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    color: colors.navy,
   },
   timeArrow: {
-    marginHorizontal: 4,
+    marginHorizontal: spacing.xs,
   },
   timezoneText: {
+    fontFamily: fonts.body,
     fontSize: 12,
-    color: '#aaa',
-    marginTop: 8,
+    color: colors.textTertiary,
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
   intervalRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
   },
   intervalChip: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#F5F7FA',
+    borderRadius: radii.md,
+    backgroundColor: colors.card,
     alignItems: 'center',
+    ...shadows.card,
   },
   intervalChipActive: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.cta,
   },
   intervalChipText: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
+    color: colors.textSecondary,
   },
   intervalChipTextActive: {
     color: '#fff',
@@ -529,21 +538,22 @@ const styles = StyleSheet.create({
   summaryCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#EBF2FA',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 107, 107, 0.08)',
+    borderRadius: radii.md,
     padding: 14,
-    marginBottom: 20,
+    marginBottom: spacing.lg,
     gap: 10,
   },
   summaryText: {
     flex: 1,
+    fontFamily: fonts.body,
     fontSize: 14,
-    color: '#4A90D9',
+    color: colors.cta,
     lineHeight: 20,
   },
   saveButton: {
-    backgroundColor: '#4A90D9',
-    borderRadius: 12,
+    backgroundColor: colors.cta,
+    borderRadius: radii.md,
     padding: 18,
     alignItems: 'center',
   },
@@ -552,8 +562,8 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: '#fff',
+    fontFamily: fonts.heading,
     fontSize: 18,
-    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
@@ -562,17 +572,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
     width: '80%',
     maxHeight: '60%',
-    padding: 20,
+    padding: spacing.lg,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 16,
+    ...typography.h3,
+    marginBottom: spacing.md,
     textAlign: 'center',
   },
   hourList: {
@@ -583,18 +591,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
   },
   hourOptionActive: {
-    backgroundColor: '#EBF2FA',
+    backgroundColor: 'rgba(255, 107, 107, 0.08)',
   },
   hourOptionText: {
+    fontFamily: fonts.body,
     fontSize: 16,
-    color: '#1a1a1a',
+    color: colors.navy,
   },
   hourOptionTextActive: {
-    color: '#4A90D9',
-    fontWeight: '600',
+    color: colors.cta,
+    fontFamily: fonts.bodySemiBold,
   },
 });

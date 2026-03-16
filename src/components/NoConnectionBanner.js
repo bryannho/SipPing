@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetwork } from '../hooks/useNetwork';
+import { colors, fonts } from '../theme';
 
 export function NoConnectionBanner() {
   const { isConnected } = useNetwork();
@@ -22,7 +23,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#E74C3C',
+    backgroundColor: colors.error,
     paddingBottom: 8,
     paddingHorizontal: 16,
     zIndex: 1000,
@@ -30,7 +31,7 @@ const styles = StyleSheet.create({
   },
   text: {
     color: '#fff',
+    fontFamily: fonts.bodySemiBold,
     fontSize: 14,
-    fontWeight: '600',
   },
 });

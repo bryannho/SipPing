@@ -259,13 +259,14 @@ export function ActivityScreen({ navigation }) {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Trip selector dropdown */}
+      {/* Screen title */}
+      <Text style={styles.screenTitle}>Activity</Text>
       <TouchableOpacity
-        style={styles.tripDropdown}
+        style={styles.subtitleRow}
         onPress={() => trips.length > 1 && setTripDropdownOpen(!tripDropdownOpen)}
         activeOpacity={trips.length > 1 ? 0.7 : 1}
       >
-        <Text style={styles.tripDropdownText}>{selectedTrip.name}</Text>
+        <Text style={styles.screenSubtitle}>{selectedTrip.name}</Text>
         {selectedTrip.status !== 'active' && (
           <View style={styles.doneBadge}>
             <Text style={styles.doneBadgeText}>Done</Text>
@@ -274,7 +275,7 @@ export function ActivityScreen({ navigation }) {
         {trips.length > 1 && (
           <Ionicons
             name={tripDropdownOpen ? 'chevron-up' : 'chevron-down'}
-            size={20}
+            size={16}
             color={colors.textSecondary}
           />
         )}
@@ -320,7 +321,22 @@ export function ActivityScreen({ navigation }) {
         style={styles.shareableCard}
       >
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Trip Summary</Text>
+          <View style={styles.summaryHeader}>
+            <Text style={styles.summaryTitle}>Trip Summary</Text>
+            {stats.length > 0 && (
+              <TouchableOpacity
+                style={styles.shareIconButton}
+                onPress={handleShare}
+                disabled={sharing}
+              >
+                {sharing ? (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                ) : (
+                  <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
 
           {stats.length === 0 ? (
             <View style={styles.emptySummary}>
@@ -329,78 +345,61 @@ export function ActivityScreen({ navigation }) {
               </Text>
             </View>
           ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.memberStatsRow}
-            >
-              {stats.map((member) => (
-                <View
-                  key={member.id}
-                  style={[
-                    styles.memberStatCard,
-                    member.isCurrentUser && styles.memberStatCardSelf,
-                  ]}
-                >
-                  <View style={styles.memberStatAvatar}>
-                    <Text style={styles.memberStatInitial}>
-                      {(member.name || '?')[0].toUpperCase()}
+            <View style={styles.memberStatsRow}>
+              {stats.map((member, index) => (
+                <React.Fragment key={member.id}>
+                  {index > 0 && <View style={styles.memberDivider} />}
+                  <View
+                    style={[
+                      styles.memberStatCard,
+                      member.isCurrentUser && styles.memberStatCardSelf,
+                    ]}
+                  >
+                    <View style={styles.memberStatAvatar}>
+                      <Text style={styles.memberStatInitial}>
+                        {(member.name || '?')[0].toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.memberStatName} numberOfLines={1}>
+                      {member.isCurrentUser ? 'You' : member.name}
                     </Text>
-                  </View>
-                  <Text style={styles.memberStatName} numberOfLines={1}>
-                    {member.isCurrentUser ? 'You' : member.name}
-                  </Text>
 
-                  <View style={styles.memberStatGrid}>
-                    <View style={styles.miniStat}>
-                      <Text style={styles.miniStatValue}>💧 {member.waterCount}</Text>
-                      <Text style={styles.miniStatLabel}>Waters</Text>
-                    </View>
-                    <View style={styles.miniStat}>
-                      <Text style={styles.miniStatValue}>🍾 {member.shotCount}</Text>
-                      <Text style={styles.miniStatLabel}>Shots</Text>
-                    </View>
-                    <View style={styles.miniStat}>
-                      <Text style={styles.miniStatValue}>
-                        {member.acceptanceRate !== null
-                          ? `${member.acceptanceRate}%`
-                          : '—'}
-                      </Text>
-                      <Text style={styles.miniStatLabel}>Accept</Text>
-                    </View>
-                    <View style={styles.miniStat}>
-                      <Text style={styles.miniStatValue}>
-                        {member.streak > 0 ? `🔥 ${member.streak}` : '—'}
-                      </Text>
-                      <Text style={styles.miniStatLabel}>Streak</Text>
+                    <View style={styles.memberStatGrid}>
+                      <View style={styles.miniStatRow}>
+                        <Text style={styles.miniStatWaterValue}>
+                          {'\uD83D\uDCA7'} {member.waterCount}
+                        </Text>
+                      </View>
+                      <View style={styles.miniStatRow}>
+                        <Text style={styles.miniStatShotValue}>
+                          {'\uD83E\uDD43'} {member.shotCount}
+                        </Text>
+                      </View>
+
+                      <View style={styles.memberStatDivider} />
+
+                      <View style={styles.miniStat}>
+                        <Text style={styles.miniStatValue}>
+                          {member.acceptanceRate !== null
+                            ? `${member.acceptanceRate}%`
+                            : '\u2014'}
+                        </Text>
+                        <Text style={styles.miniStatLabel}>Accept</Text>
+                      </View>
+                      <View style={styles.miniStat}>
+                        <Text style={styles.miniStatValue}>
+                          {member.streak > 0 ? `\uD83D\uDD25 ${member.streak}` : '\u2014'}
+                        </Text>
+                        <Text style={styles.miniStatLabel}>Streak</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
+                </React.Fragment>
               ))}
-            </ScrollView>
+            </View>
           )}
-
-          <Text style={styles.watermark}>SipPing</Text>
         </View>
       </ViewShot>
-
-      {/* Share button */}
-      {stats.length > 0 && (
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={handleShare}
-          disabled={sharing}
-        >
-          {sharing ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="share-outline" size={18} color="#fff" />
-              <Text style={styles.shareButtonText}>Share Stats</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      )}
 
       {/* Inline Drink Log */}
       <View style={styles.logSection}>
@@ -424,7 +423,7 @@ export function ActivityScreen({ navigation }) {
           </View>
         ) : (
           recentLogs.map((log) => {
-            const emoji = log.type === 'water' ? '💧' : '🍾';
+            const emoji = log.type === 'water' ? '\uD83D\uDCA7' : '\uD83E\uDD43';
             const userName = log.user?.name || log.user?.email || 'Unknown';
             const isCurrentUser = log.user_id === user.id;
 
@@ -491,20 +490,23 @@ const styles = StyleSheet.create({
     ...typography.caption,
     textAlign: 'center',
   },
-  // Trip dropdown
-  tripDropdown: {
+  // Screen header
+  screenTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 28,
+    color: colors.navy,
+    marginBottom: spacing.xs,
+  },
+  screenSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: 15,
+    color: colors.textSecondary,
+  },
+  subtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: radii.card,
-    padding: spacing.md,
-    marginBottom: spacing.md,
     gap: spacing.sm,
-    ...shadows.card,
-  },
-  tripDropdownText: {
-    ...typography.h2,
-    flex: 1,
+    marginBottom: spacing.md,
   },
   doneBadge: {
     backgroundColor: 'rgba(76, 175, 125, 0.12)',
@@ -555,9 +557,22 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     ...shadows.card,
   },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
   summaryTitle: {
     ...typography.h3,
-    marginBottom: spacing.md,
+  },
+  shareIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#FAF6F1',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptySummary: {
     padding: spacing.lg,
@@ -568,19 +583,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   memberStatsRow: {
-    gap: spacing.md,
-    paddingBottom: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  memberDivider: {
+    width: 1,
+    backgroundColor: colors.border,
+    alignSelf: 'stretch',
+    marginHorizontal: spacing.sm,
   },
   memberStatCard: {
-    backgroundColor: colors.bg,
-    borderRadius: radii.card,
-    padding: spacing.md,
+    flex: 1,
     alignItems: 'center',
-    width: 160,
+    paddingVertical: spacing.sm,
   },
   memberStatCardSelf: {
-    borderWidth: 1.5,
-    borderColor: colors.cta,
+    // subtle highlight for current user — no border needed in row layout
   },
   memberStatAvatar: {
     width: 44,
@@ -589,7 +607,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lavender,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   memberStatInitial: {
     color: '#fff',
@@ -600,15 +618,36 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     fontSize: 14,
     color: colors.navy,
-    marginBottom: spacing.sm,
   },
   memberStatGrid: {
     width: '100%',
+    marginTop: spacing.sm,
+  },
+  miniStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  miniStatWaterValue: {
+    fontFamily: fonts.headingSemiBold,
+    fontSize: 20,
+    color: '#1A9E92',
+  },
+  miniStatShotValue: {
+    fontFamily: fonts.headingSemiBold,
+    fontSize: 20,
+    color: '#C47538',
+  },
+  memberStatDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.sm,
   },
   miniStat: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 3,
+    paddingHorizontal: spacing.xs,
   },
   miniStatValue: {
     fontFamily: fonts.bodySemiBold,
@@ -619,29 +658,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.textSecondary,
-  },
-  watermark: {
-    textAlign: 'center',
-    fontFamily: fonts.headingRegular,
-    fontSize: 12,
-    color: colors.textTertiary,
-    marginTop: spacing.md,
-  },
-  // Share button
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.cta,
-    borderRadius: radii.md,
-    paddingVertical: 14,
-    marginBottom: spacing.lg,
-    gap: spacing.sm,
-  },
-  shareButtonText: {
-    color: '#fff',
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 15,
   },
   // Drink log section
   logSection: {

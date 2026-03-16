@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { colors, fonts, radii, spacing, typography } from '../../theme';
 
 export function JoinTripScreen({ route, navigation }) {
   const { user } = useAuth();
@@ -72,6 +73,7 @@ export function JoinTripScreen({ route, navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Invite code (e.g. ABC123)"
+        placeholderTextColor={colors.textTertiary}
         value={code}
         onChangeText={setCode}
         autoCapitalize="characters"
@@ -94,36 +96,35 @@ export function JoinTripScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingHorizontal: 32,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.xl,
     paddingTop: 40,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
+    ...typography.h1,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 15,
-    color: '#888',
+    ...typography.caption,
     marginBottom: 28,
     lineHeight: 22,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: radii.md,
     padding: 14,
+    fontFamily: fonts.body,
     fontSize: 20,
+    color: colors.navy,
     textAlign: 'center',
     letterSpacing: 4,
-    backgroundColor: '#fafafa',
-    marginBottom: 20,
+    backgroundColor: colors.card,
+    marginBottom: spacing.lg,
   },
   button: {
-    backgroundColor: '#4A90D9',
-    borderRadius: 10,
+    backgroundColor: colors.cta,
+    borderRadius: radii.md,
     padding: 16,
     alignItems: 'center',
   },
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    fontFamily: fonts.bodySemiBold,
     fontSize: 17,
-    fontWeight: '600',
   },
 });

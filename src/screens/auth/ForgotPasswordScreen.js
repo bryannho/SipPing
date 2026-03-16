@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
+import { colors, fonts, radii, spacing, typography } from '../../theme';
 
 export function ForgotPasswordScreen({ navigation }) {
   const { resetPassword } = useAuth();
@@ -51,6 +52,7 @@ export function ForgotPasswordScreen({ navigation }) {
         <TextInput
           style={styles.input}
           placeholder="Email"
+          placeholderTextColor={colors.textTertiary}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -79,42 +81,45 @@ export function ForgotPasswordScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
   },
   inner: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: spacing.xl,
   },
   title: {
+    fontFamily: fonts.heading,
     fontSize: 30,
-    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 4,
-    color: '#1a1a1a',
+    marginBottom: spacing.xs,
+    color: colors.navy,
   },
   subtitle: {
+    fontFamily: fonts.body,
     fontSize: 15,
     textAlign: 'center',
-    color: '#888',
-    marginBottom: 32,
+    color: colors.textSecondary,
+    marginBottom: spacing.xl,
     lineHeight: 22,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: radii.md,
     padding: 14,
+    fontFamily: fonts.body,
     fontSize: 16,
+    color: colors.navy,
     marginBottom: 14,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.card,
   },
   button: {
-    backgroundColor: '#4A90D9',
-    borderRadius: 10,
+    backgroundColor: colors.cta,
+    borderRadius: radii.md,
     padding: 16,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
     marginBottom: 20,
   },
   buttonDisabled: {
@@ -122,13 +127,13 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    fontFamily: fonts.bodySemiBold,
     fontSize: 17,
-    fontWeight: '600',
   },
   link: {
     textAlign: 'center',
-    color: '#4A90D9',
+    fontFamily: fonts.bodySemiBold,
+    color: colors.cta,
     fontSize: 14,
-    fontWeight: '600',
   },
 });

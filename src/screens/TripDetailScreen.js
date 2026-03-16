@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 export function TripDetailScreen({ route, navigation }) {
   const { tripId, tripName, inviteCode, isNew } = route.params;
@@ -102,7 +103,7 @@ export function TripDetailScreen({ route, navigation }) {
     <View style={styles.container}>
       {isNew && (
         <View style={styles.successBanner}>
-          <Ionicons name="checkmark-circle" size={18} color="#27AE60" />
+          <Ionicons name="checkmark-circle" size={18} color={colors.success} />
           <Text style={styles.successText}>
             Trip created! Share the invite code below.
           </Text>
@@ -120,33 +121,33 @@ export function TripDetailScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.infoSection}>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Started</Text>
-          <Text style={styles.infoValue}>
+      <View style={styles.infoGrid}>
+        <View style={styles.infoTile}>
+          <Text style={styles.infoTileValue}>
             {trip?.start_date
-              ? new Date(trip.start_date + 'T00:00:00').toLocaleDateString()
+              ? new Date(trip.start_date + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })
               : '—'}
           </Text>
+          <Text style={styles.infoTileLabel}>Started</Text>
         </View>
         {trip?.end_date && (
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Ends</Text>
-            <Text style={styles.infoValue}>
-              {new Date(trip.end_date + 'T00:00:00').toLocaleDateString()}
+          <View style={styles.infoTile}>
+            <Text style={styles.infoTileValue}>
+              {new Date(trip.end_date + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
             </Text>
+            <Text style={styles.infoTileLabel}>Ends</Text>
           </View>
         )}
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Status</Text>
+        <View style={styles.infoTile}>
           <Text
             style={[
-              styles.infoValue,
+              styles.infoTileValue,
               trip?.status === 'active' && styles.statusActive,
             ]}
           >
-            {trip?.status || 'active'}
+            {trip?.status === 'active' ? 'Active' : trip?.status || 'active'}
           </Text>
+          <Text style={styles.infoTileLabel}>Status</Text>
         </View>
       </View>
 
@@ -172,98 +173,98 @@ export function TripDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
   },
   loadingText: {
-    fontSize: 15,
-    color: '#aaa',
+    ...typography.caption,
   },
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8F8F0',
-    borderRadius: 10,
+    backgroundColor: 'rgba(76, 175, 125, 0.1)',
+    borderRadius: radii.md,
     padding: 14,
-    marginBottom: 16,
-    gap: 8,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   successText: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 14,
-    color: '#27AE60',
-    fontWeight: '500',
+    color: colors.success,
     flex: 1,
   },
   codeSection: {
     alignItems: 'center',
-    backgroundColor: '#F5F7FA',
-    borderRadius: 14,
-    padding: 24,
-    marginBottom: 20,
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    ...shadows.card,
   },
   codeLabel: {
-    fontSize: 13,
-    color: '#888',
-    fontWeight: '500',
+    ...typography.label,
     marginBottom: 6,
-    textTransform: 'uppercase',
     letterSpacing: 1,
   },
   codeValue: {
+    fontFamily: fonts.heading,
     fontSize: 32,
-    fontWeight: '700',
-    color: '#1a1a1a',
+    color: colors.navy,
     letterSpacing: 6,
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4A90D9',
-    borderRadius: 10,
+    backgroundColor: colors.cta,
+    borderRadius: radii.md,
     paddingVertical: 10,
     paddingHorizontal: 20,
     gap: 6,
   },
   shareButtonText: {
     color: '#fff',
+    fontFamily: fonts.bodySemiBold,
     fontSize: 15,
-    fontWeight: '600',
   },
-  infoSection: {
-    marginBottom: 20,
-  },
-  infoRow: {
+  infoGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
-  infoLabel: {
-    fontSize: 15,
-    color: '#888',
+  infoTile: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    ...shadows.card,
   },
-  infoValue: {
-    fontSize: 15,
-    color: '#1a1a1a',
-    fontWeight: '500',
+  infoTileValue: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 16,
+    color: colors.navy,
+    marginBottom: 4,
+  },
+  infoTileLabel: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
   statusActive: {
-    color: '#27AE60',
+    color: colors.success,
   },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 12,
+    ...typography.h3,
+    marginBottom: spacing.md,
   },
   membersList: {
     flex: 1,
@@ -273,40 +274,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.border,
   },
   memberAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.lavender,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   memberInitial: {
     color: '#fff',
+    fontFamily: fonts.bodySemiBold,
     fontSize: 17,
-    fontWeight: '600',
   },
   memberInfo: {
     flex: 1,
   },
   memberName: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1a1a1a',
+    color: colors.navy,
   },
   memberEmail: {
+    ...typography.caption,
     fontSize: 13,
-    color: '#aaa',
     marginTop: 2,
   },
   youBadge: {
+    fontFamily: fonts.bodySemiBold,
     fontSize: 12,
-    fontWeight: '600',
-    color: '#4A90D9',
-    backgroundColor: '#EBF2FA',
+    color: colors.cta,
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -314,15 +315,15 @@ const styles = StyleSheet.create({
   },
   endButton: {
     borderWidth: 1,
-    borderColor: '#E74C3C',
-    borderRadius: 10,
+    borderColor: colors.error,
+    borderRadius: radii.md,
     padding: 14,
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: spacing.lg,
   },
   endButtonText: {
-    color: '#E74C3C',
+    color: colors.error,
+    fontFamily: fonts.bodySemiBold,
     fontSize: 16,
-    fontWeight: '600',
   },
 });

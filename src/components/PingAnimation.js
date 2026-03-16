@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet, Dimensions } from 'react-native';
+import { colors } from '../theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PARTICLE_COUNT = 24;
@@ -18,7 +19,7 @@ export function ShotConfetti({ onComplete }) {
       x: randomBetween(-SCREEN_WIDTH * 0.4, SCREEN_WIDTH * 0.4),
       y: randomBetween(-SCREEN_HEIGHT * 0.5, -SCREEN_HEIGHT * 0.1),
       rotation: randomBetween(0, 720),
-      color: ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#FF922B', '#845EC2'][
+      color: [colors.cta, '#FFD93D', colors.success, colors.teal, colors.amber, colors.lavender][
         Math.floor(Math.random() * 6)
       ],
       size: randomBetween(6, 14),
@@ -212,10 +213,10 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#4A90D9',
+    backgroundColor: colors.teal,
   },
   droplet: {
     position: 'absolute',
-    backgroundColor: '#5DADE2',
+    backgroundColor: colors.teal,
   },
 });
