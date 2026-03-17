@@ -42,6 +42,22 @@ npm start
 
 4. Scan the QR code with Expo Go on your phone.
 
+## Deploy to TestFlight
+
+1. First time only — push environment variables to EAS:
+
+```bash
+./scripts/setup-eas-env.sh
+```
+
+2. Build and submit to TestFlight:
+
+```bash
+./scripts/deploy-testflight.sh
+```
+
+The build number auto-increments on each run. Testers with the app installed will be notified of the new version in TestFlight.
+
 ## Project Structure
 
 ```
