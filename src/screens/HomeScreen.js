@@ -17,9 +17,11 @@ import { useAuth } from '../hooks/useAuth';
 import { pickAndUploadDrinkPhoto } from '../utils/imageUpload';
 import { playAcceptHaptic, playDeclineHaptic } from '../utils/sounds';
 import { PingAnimation } from '../components/PingAnimation';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 export function HomeScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [trips, setTrips] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState(null);
@@ -403,7 +405,7 @@ export function HomeScreen({ navigation }) {
         onComplete={() => setAnimation(null)}
       />
       {successMessage && (
-        <Animated.View style={[styles.successBanner, { opacity: successOpacity }]}>
+        <Animated.View style={[styles.successBanner, { opacity: successOpacity, paddingTop: insets.top + 12 }]}>
           <Ionicons name="checkmark-circle" size={20} color="#fff" />
           <Text style={styles.successBannerText}>{successMessage}</Text>
         </Animated.View>
@@ -465,13 +467,10 @@ export function HomeScreen({ navigation }) {
           <TouchableOpacity
             style={styles.tripInfoButton}
             onPress={() =>
-              navigation.navigate('MeTab', {
-                screen: 'TripDetail',
-                params: {
-                  tripId: selectedTrip.id,
-                  tripName: selectedTrip.name,
-                  inviteCode: selectedTrip.invite_code,
-                },
+              navigation.navigate('TripDetail', {
+                tripId: selectedTrip.id,
+                tripName: selectedTrip.name,
+                inviteCode: selectedTrip.invite_code,
               })
             }
           >
