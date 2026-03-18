@@ -58,6 +58,35 @@ npm start
 
 The build number auto-increments on each run. Testers with the app installed will be notified of the new version in TestFlight.
 
+## Privacy Policy
+
+**Last updated: March 18, 2026**
+
+SipPing is a social drinking companion app. This policy describes what data we collect and how we use it.
+
+### Data We Collect
+
+- **Account information:** Email address and display name when you sign up (directly or via Google Sign-In).
+- **Push notification tokens:** Your device's Expo push token, used solely to deliver ping notifications.
+- **Trip and ping data:** Trips you create or join, pings you send and receive, drink logs, and scheduled rules.
+- **Photos:** Drink photos you optionally upload when accepting a ping.
+
+### How We Use Your Data
+
+All data is used exclusively to provide app functionality — delivering pings, tracking stats, and displaying trip activity. We do not sell, share, or use your data for advertising.
+
+### Data Storage
+
+Data is stored in Supabase (hosted on AWS). Photos are stored in Supabase Storage. All database access is secured with row-level security scoped to trip membership.
+
+### Data Deletion
+
+You can delete your account from the Me tab in the app. This permanently removes your profile, pings, drink logs, scheduled rules, and uploaded photos.
+
+### Contact
+
+For questions about this policy, open an issue on this repository.
+
 ## Project Structure
 
 ```
