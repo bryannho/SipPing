@@ -8,7 +8,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  ScrollView,
   Modal,
   Dimensions,
 } from 'react-native';
@@ -28,9 +27,11 @@ export function DrinkLogScreen({ route }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [tripDropdownOpen, setTripDropdownOpen] = useState(false);
   const [viewingImage, setViewingImage] = useState(null);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const listRef = React.useRef();
 
   const fetchTrips = useCallback(async () => {
     const { data } = await supabase
@@ -213,40 +214,67 @@ export function DrinkLogScreen({ route }) {
     );
   }
 
+  const selectedTrip = trips.find((t) => t.id === selectedTripId) || trips[0];
+
   return (
     <View style={styles.container}>
-      {/* Trip selector */}
+      {/* Trip dropdown */}
       {trips.length > 1 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.tripSelector}
-          contentContainerStyle={styles.tripSelectorContent}
-        >
-          {trips.map((trip) => (
-            <TouchableOpacity
-              key={trip.id}
-              style={[
-                styles.tripTab,
-                trip.id === selectedTripId && styles.tripTabActive,
-              ]}
-              onPress={() => {
-                setSelectedTripId(trip.id);
-                fetchLogs(trip.id);
-              }}
-            >
-              <Text
-                style={[
-                  styles.tripTabText,
-                  trip.id === selectedTripId && styles.tripTabTextActive,
-                ]}
-                numberOfLines={1}
-              >
-                {trip.name}
+        <View style={styles.tripDropdownWrapper}>
+          <TouchableOpacity
+            style={styles.tripDropdown}
+            onPress={() => setTripDropdownOpen(!tripDropdownOpen)}
+          >
+            <Text style={styles.tripIcon}>🌴</Text>
+            <View style={styles.tripDropdownTextContainer}>
+              <Text style={styles.tripDropdownText} numberOfLines={1}>
+                {selectedTrip.name}
               </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+              {selectedTrip.status !== 'active' && (
+                <Text style={styles.tripDropdownSubtitle}>Completed</Text>
+              )}
+            </View>
+            <Ionicons
+              name={tripDropdownOpen ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          {tripDropdownOpen && (
+            <View style={styles.tripDropdownMenu}>
+              {trips.map((trip) => (
+                <TouchableOpacity
+                  key={trip.id}
+                  style={[
+                    styles.tripDropdownItem,
+                    trip.id === selectedTripId && styles.tripDropdownItemActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedTripId(trip.id);
+                    fetchLogs(trip.id);
+                    setTripDropdownOpen(false);
+                    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.tripDropdownItemText,
+                      trip.id === selectedTripId && styles.tripDropdownItemTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {trip.name}
+                    {trip.status !== 'active' ? ' (done)' : ''}
+                  </Text>
+                  {trip.id === selectedTripId && (
+                    <Ionicons name="checkmark" size={18} color={colors.cta} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
       )}
 
       {/* Summary bar */}
@@ -263,6 +291,7 @@ export function DrinkLogScreen({ route }) {
       )}
 
       <FlatList
+        ref={listRef}
         data={groupedLogs}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
@@ -342,32 +371,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.bg,
   },
-  tripSelector: {
-    maxHeight: 52,
+  tripDropdownWrapper: {
+    padding: spacing.md,
+  },
+  tripDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    padding: spacing.md,
+    ...shadows.card,
+  },
+  tripIcon: {
+    fontSize: 20,
+    marginRight: spacing.sm,
+  },
+  tripDropdownTextContainer: {
+    flex: 1,
+  },
+  tripDropdownText: {
+    ...typography.h2,
+  },
+  tripDropdownSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.success,
+    marginTop: 2,
+  },
+  tripDropdownMenu: {
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    marginTop: spacing.sm,
+    overflow: 'hidden',
+    ...shadows.card,
+  },
+  tripDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  tripSelectorContent: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+  tripDropdownItemActive: {
+    backgroundColor: 'rgba(255, 107, 107, 0.06)',
   },
-  tripTab: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    backgroundColor: colors.card,
-    marginRight: spacing.sm,
+  tripDropdownItemText: {
+    ...typography.bodyMedium,
+    flex: 1,
   },
-  tripTabActive: {
-    backgroundColor: colors.cta,
-  },
-  tripTabText: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  tripTabTextActive: {
-    color: '#fff',
+  tripDropdownItemTextActive: {
+    color: colors.cta,
+    fontFamily: fonts.bodySemiBold,
   },
   summaryBar: {
     backgroundColor: colors.card,
@@ -470,7 +525,7 @@ const styles = StyleSheet.create({
   },
   photoThumbnail: {
     width: '100%',
-    height: 200,
+    aspectRatio: 3 / 4,
     borderRadius: radii.md,
   },
   modalOverlay: {

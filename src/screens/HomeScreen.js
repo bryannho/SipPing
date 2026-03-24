@@ -66,14 +66,24 @@ export function HomeScreen({ navigation }) {
       (t) => t.status === 'active' && t.end_date && t.end_date < today
     );
     if (tripsToComplete.length > 0) {
-      await Promise.all(
-        tripsToComplete.map((t) =>
+      const tripIds = tripsToComplete.map((t) => t.id);
+      await Promise.all([
+        ...tripsToComplete.map((t) =>
           supabase
             .from('trips')
             .update({ status: 'completed' })
             .eq('id', t.id)
-        )
-      );
+        ),
+        supabase
+          .from('scheduled_rules')
+          .update({ active: false })
+          .in('trip_id', tripIds),
+        supabase
+          .from('drink_pings')
+          .update({ status: 'declined', response_note: 'Trip ended', responded_at: new Date().toISOString() })
+          .in('trip_id', tripIds)
+          .in('status', ['pending', 'snoozed']),
+      ]);
       tripsToComplete.forEach((t) => {
         t.status = 'completed';
       });

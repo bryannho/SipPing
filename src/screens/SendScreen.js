@@ -137,7 +137,8 @@ export function SendScreen({ route, navigation }) {
         recipient.expo_push_token,
         senderProfile?.name || user.email,
         drinkType,
-        ping.id
+        ping.id,
+        note.trim() || null
       );
     }
 

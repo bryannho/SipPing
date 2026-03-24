@@ -59,10 +59,21 @@ export function TripDetailScreen({ route, navigation }) {
           text: 'End Trip',
           style: 'destructive',
           onPress: async () => {
-            await supabase
-              .from('trips')
-              .update({ status: 'completed' })
-              .eq('id', tripId);
+            await Promise.all([
+              supabase
+                .from('trips')
+                .update({ status: 'completed' })
+                .eq('id', tripId),
+              supabase
+                .from('scheduled_rules')
+                .update({ active: false })
+                .eq('trip_id', tripId),
+              supabase
+                .from('drink_pings')
+                .update({ status: 'declined', response_note: 'Trip ended', responded_at: new Date().toISOString() })
+                .eq('trip_id', tripId)
+                .in('status', ['pending', 'snoozed']),
+            ]);
             navigation.goBack();
           },
         },

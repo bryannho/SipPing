@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
@@ -23,6 +24,7 @@ import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export function ActivityScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [trips, setTrips] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState(null);
@@ -37,6 +39,7 @@ export function ActivityScreen({ navigation }) {
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   const viewShotRef = useRef();
+  const scrollRef = useRef();
 
   const fetchTrips = useCallback(async () => {
     const { data } = await supabase
@@ -281,8 +284,9 @@ export function ActivityScreen({ navigation }) {
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.lg }]}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -322,6 +326,7 @@ export function ActivityScreen({ navigation }) {
                 setSelectedTripId(trip.id);
                 Promise.all([fetchStats(trip.id), fetchRecentLogs(trip.id)]);
                 setTripDropdownOpen(false);
+                scrollRef.current?.scrollTo({ y: 0, animated: true });
               }}
             >
               <Text
@@ -564,7 +569,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: spacing.lg,
-    paddingTop: 60,
     paddingBottom: 40,
   },
   centered: {

@@ -111,7 +111,7 @@ Deno.serve(async (req: Request) => {
     // ── PART 2: Process snoozed pings past their deadline ────
     const { data: snoozedPings, error: snoozedError } = await supabase
       .from("drink_pings")
-      .select("id, trip_id, from_user_id, to_user_id, type, snooze_count")
+      .select("id, trip_id, from_user_id, to_user_id, type, snooze_count, sender_note")
       .eq("status", "snoozed")
       .lt("snoozed_until", now.toISOString());
 
@@ -155,7 +155,8 @@ Deno.serve(async (req: Request) => {
             ping.type,
             ping.from_user_id,
             false,
-            ping.id
+            ping.id,
+            ping.sender_note
           );
         }
         results.snoozed++;
@@ -186,7 +187,8 @@ async function sendPushNotification(
   drinkType: string,
   otherUserId: string,
   isDeclineNotification = false,
-  pingId: string | null = null
+  pingId: string | null = null,
+  senderNote: string | null = null
 ) {
   // Get recipient's push token
   const { data: recipient } = await supabase
@@ -216,7 +218,9 @@ async function sendPushNotification(
     const emoji = drinkType === "water" ? "\u{1F4A7}" : "\u{1F943}";
     const drinkLabel = drinkType === "water" ? "water" : "a shot";
     title = `${emoji} Drink Ping!`;
-    body = `${otherName} wants you to drink ${drinkLabel}!`;
+    body = senderNote
+      ? `${otherName}: ${senderNote}`
+      : `${otherName} wants you to drink ${drinkLabel}!`;
   }
 
   const message = {

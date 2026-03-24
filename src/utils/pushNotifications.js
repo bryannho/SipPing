@@ -79,10 +79,14 @@ export async function sendDrinkPingNotification(
   recipientPushToken,
   senderName,
   drinkType,
-  pingId
+  pingId,
+  senderNote
 ) {
   const emoji = drinkType === 'water' ? '\u{1F4A7}' : '\u{1F943}';
   const drinkLabel = drinkType === 'water' ? 'water' : 'a shot';
+  const body = senderNote
+    ? `${senderName}: ${senderNote}`
+    : `${senderName} wants you to drink ${drinkLabel}!`;
 
   try {
     await fetch(EXPO_PUSH_URL, {
@@ -95,7 +99,7 @@ export async function sendDrinkPingNotification(
         to: recipientPushToken,
         sound: 'default',
         title: `${emoji} Drink Ping!`,
-        body: `${senderName} wants you to drink ${drinkLabel}!`,
+        body,
         data: { type: 'drink_ping', drinkType, pingId },
         categoryId: 'drink_ping',
       }),
