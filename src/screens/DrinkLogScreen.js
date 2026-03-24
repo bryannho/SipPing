@@ -154,46 +154,50 @@ export function DrinkLogScreen({ route }) {
       minute: '2-digit',
     });
 
+    const hasPhoto = item.image_url && signedUrls[item.image_url];
+
     return (
-      <View style={styles.logRow}>
-        <Text style={styles.logEmoji}>{emoji}</Text>
-        <View style={styles.logInfo}>
-          <Text style={styles.logUser}>
-            {isCurrentUser ? 'You' : userName}
-          </Text>
-          <Text style={styles.logTime}>{timeStr}</Text>
-        </View>
-        <View
-          style={[
-            styles.typeBadge,
-            item.type === 'shot' ? styles.typeBadgeShot : styles.typeBadgeWater,
-          ]}
-        >
-          <Text
+      <View>
+        <View style={styles.logRow}>
+          <Text style={styles.logEmoji}>{emoji}</Text>
+          <View style={styles.logInfo}>
+            <Text style={styles.logUser}>
+              {isCurrentUser ? 'You' : userName}
+            </Text>
+            <Text style={styles.logTime}>{timeStr}</Text>
+          </View>
+          <View
             style={[
-              styles.typeBadgeText,
-              item.type === 'shot'
-                ? styles.typeBadgeTextShot
-                : styles.typeBadgeTextWater,
+              styles.typeBadge,
+              item.type === 'shot' ? styles.typeBadgeShot : styles.typeBadgeWater,
             ]}
           >
-            {item.type}
-          </Text>
+            <Text
+              style={[
+                styles.typeBadgeText,
+                item.type === 'shot'
+                  ? styles.typeBadgeTextShot
+                  : styles.typeBadgeTextWater,
+              ]}
+            >
+              {item.type}
+            </Text>
+          </View>
         </View>
-        {item.image_url && signedUrls[item.image_url] && (
+        {hasPhoto && (
           <TouchableOpacity
+            style={styles.photoContainer}
             onPress={() => {
               setImageLoading(true);
               setImageError(false);
               setViewingImage(signedUrls[item.image_url]);
             }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.9}
           >
-            <Ionicons
-              name="camera"
-              size={18}
-              color={colors.cta}
-              style={styles.photoIcon}
+            <Image
+              source={{ uri: signedUrls[item.image_url] }}
+              style={styles.photoThumbnail}
+              resizeMode="cover"
             />
           </TouchableOpacity>
         )}
@@ -459,8 +463,15 @@ const styles = StyleSheet.create({
   typeBadgeTextShot: {
     color: colors.amber,
   },
-  photoIcon: {
-    marginLeft: spacing.sm,
+  photoContainer: {
+    marginBottom: 6,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+  },
+  photoThumbnail: {
+    width: '100%',
+    height: 200,
+    borderRadius: radii.md,
   },
   modalOverlay: {
     flex: 1,
@@ -476,7 +487,7 @@ const styles = StyleSheet.create({
   },
   fullImage: {
     width: SCREEN_WIDTH - 32,
-    height: SCREEN_WIDTH - 32,
+    height: '80%',
     borderRadius: radii.sm,
   },
   imageLoader: {

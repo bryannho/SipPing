@@ -8,6 +8,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Image,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,16 +20,22 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 export function ActivityScreen({ navigation }) {
   const { user } = useAuth();
   const [trips, setTrips] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [stats, setStats] = useState([]);
   const [recentLogs, setRecentLogs] = useState([]);
+  const [signedUrls, setSignedUrls] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [tripDropdownOpen, setTripDropdownOpen] = useState(false);
+  const [viewingImage, setViewingImage] = useState(null);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
   const viewShotRef = useRef();
 
   const fetchTrips = useCallback(async () => {
@@ -122,7 +131,26 @@ export function ActivityScreen({ navigation }) {
         .order('logged_at', { ascending: false })
         .limit(15);
 
-      setRecentLogs(data || []);
+      const rows = data || [];
+      setRecentLogs(rows);
+
+      const photoPaths = rows
+        .filter((l) => l.image_url)
+        .map((l) => l.image_url);
+
+      if (photoPaths.length > 0) {
+        const { data: signed } = await supabase.storage
+          .from('drink-photos')
+          .createSignedUrls(photoPaths, 3600);
+
+        if (signed) {
+          const urlMap = {};
+          signed.forEach((s) => {
+            if (s.signedUrl) urlMap[s.path] = s.signedUrl;
+          });
+          setSignedUrls(urlMap);
+        }
+      }
     },
     []
   );
@@ -426,40 +454,105 @@ export function ActivityScreen({ navigation }) {
             const emoji = log.type === 'water' ? '\uD83D\uDCA7' : '\uD83E\uDD43';
             const userName = log.user?.name || log.user?.email || 'Unknown';
             const isCurrentUser = log.user_id === user.id;
+            const hasPhoto = log.image_url && signedUrls[log.image_url];
 
             return (
-              <View key={log.id} style={styles.logRow}>
-                <Text style={styles.logEmoji}>{emoji}</Text>
-                <View style={styles.logInfo}>
-                  <Text style={styles.logUser}>
-                    {isCurrentUser ? 'You' : userName}
-                  </Text>
-                  <Text style={styles.logTime}>
-                    {formatLogTime(log.logged_at)}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.typeBadge,
-                    log.type === 'shot' ? styles.typeBadgeShot : styles.typeBadgeWater,
-                  ]}
-                >
-                  <Text
+              <View key={log.id}>
+                <View style={styles.logRow}>
+                  <Text style={styles.logEmoji}>{emoji}</Text>
+                  <View style={styles.logInfo}>
+                    <Text style={styles.logUser}>
+                      {isCurrentUser ? 'You' : userName}
+                    </Text>
+                    <Text style={styles.logTime}>
+                      {formatLogTime(log.logged_at)}
+                    </Text>
+                  </View>
+                  <View
                     style={[
-                      styles.typeBadgeText,
-                      log.type === 'shot'
-                        ? styles.typeBadgeTextShot
-                        : styles.typeBadgeTextWater,
+                      styles.typeBadge,
+                      log.type === 'shot' ? styles.typeBadgeShot : styles.typeBadgeWater,
                     ]}
                   >
-                    {log.type}
-                  </Text>
+                    <Text
+                      style={[
+                        styles.typeBadgeText,
+                        log.type === 'shot'
+                          ? styles.typeBadgeTextShot
+                          : styles.typeBadgeTextWater,
+                      ]}
+                    >
+                      {log.type}
+                    </Text>
+                  </View>
                 </View>
+                {hasPhoto && (
+                  <TouchableOpacity
+                    style={styles.photoContainer}
+                    onPress={() => {
+                      setImageLoading(true);
+                      setImageError(false);
+                      setViewingImage(signedUrls[log.image_url]);
+                    }}
+                    activeOpacity={0.9}
+                  >
+                    <Image
+                      source={{ uri: signedUrls[log.image_url] }}
+                      style={styles.photoThumbnail}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
             );
           })
         )}
       </View>
+
+      {/* Full-screen image viewer */}
+      <Modal
+        visible={!!viewingImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingImage(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalClose}
+            onPress={() => setViewingImage(null)}
+          >
+            <Ionicons name="close-circle" size={36} color="#fff" />
+          </TouchableOpacity>
+          {viewingImage && (
+            imageError ? (
+              <View style={styles.imageErrorContainer}>
+                <Ionicons name="image-outline" size={48} color={colors.textSecondary} />
+                <Text style={styles.imageErrorText}>Failed to load image</Text>
+              </View>
+            ) : (
+              <>
+                {imageLoading && (
+                  <ActivityIndicator
+                    size="large"
+                    color="#fff"
+                    style={styles.imageLoader}
+                  />
+                )}
+                <Image
+                  source={{ uri: viewingImage }}
+                  style={styles.fullImage}
+                  resizeMode="contain"
+                  onLoadEnd={() => setImageLoading(false)}
+                  onError={() => {
+                    setImageLoading(false);
+                    setImageError(true);
+                  }}
+                />
+              </>
+            )
+          )}
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -733,5 +826,45 @@ const styles = StyleSheet.create({
   },
   typeBadgeTextShot: {
     color: colors.amber,
+  },
+  photoContainer: {
+    marginBottom: spacing.sm,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+  },
+  photoThumbnail: {
+    width: '100%',
+    height: 200,
+    borderRadius: radii.md,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalClose: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 10,
+  },
+  fullImage: {
+    width: SCREEN_WIDTH - 32,
+    height: '80%',
+    borderRadius: radii.sm,
+  },
+  imageLoader: {
+    position: 'absolute',
+  },
+  imageErrorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageErrorText: {
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+    fontSize: 15,
+    marginTop: 10,
   },
 });

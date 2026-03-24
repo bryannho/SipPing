@@ -39,7 +39,6 @@ export async function pickAndUploadDrinkPhoto(userId, tripId, pingId) {
     result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [1, 1],
       quality: 0.8,
     });
   } else {
@@ -51,7 +50,6 @@ export async function pickAndUploadDrinkPhoto(userId, tripId, pingId) {
     result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [1, 1],
       quality: 0.8,
     });
   }
