@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
+import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 import { registerPushToken } from '../utils/pushNotifications';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
@@ -38,6 +39,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isRecovery, setIsRecovery] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
@@ -51,17 +53,38 @@ export function AuthProvider({ children }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
+      (event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
         if (newSession?.user) {
           ensurePublicUser(newSession.user);
           registerPushToken(newSession.user.id);
         }
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsRecovery(true);
+        }
       },
     );
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Handle deep link for password recovery (PKCE flow)
+  useEffect(() => {
+    const handleUrl = async ({ url }) => {
+      if (!url) return;
+      const codeMatch = url.match(/[?&]code=([^&]+)/);
+      if (codeMatch) {
+        await supabase.auth.exchangeCodeForSession(codeMatch[1]);
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', handleUrl);
+    Linking.getInitialURL().then((url) => {
+      if (url) handleUrl({ url });
+    });
+
+    return () => subscription.remove();
   }, []);
 
   const signIn = async (email, password) => {
@@ -85,8 +108,16 @@ export function AuthProvider({ children }) {
     return { error };
   };
 
-  const resetPassword = async (email) => {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email);
+  const resetPassword = async (email, options) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, options);
+    return { data, error };
+  };
+
+  const updatePassword = async (password) => {
+    const { data, error } = await supabase.auth.updateUser({ password });
+    if (!error) {
+      setIsRecovery(false);
+    }
     return { data, error };
   };
 
@@ -143,10 +174,12 @@ export function AuthProvider({ children }) {
         user,
         session,
         loading,
+        isRecovery,
         signIn,
         signUp,
         signOut,
         resetPassword,
+        updatePassword,
         signInWithGoogle,
         updateProfile,
       }}

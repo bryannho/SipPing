@@ -5,9 +5,10 @@ import { LoadingScreen } from '../components/LoadingScreen';
 import { NoConnectionBanner } from '../components/NoConnectionBanner';
 import { AuthStack } from './AuthStack';
 import { AppTabs } from './AppTabs';
+import { ResetPasswordScreen } from '../screens/auth/ResetPasswordScreen';
 
 export function RootNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, isRecovery } = useAuth();
 
   if (loading) {
     return <LoadingScreen />;
@@ -16,7 +17,7 @@ export function RootNavigator() {
   return (
     <View style={styles.container}>
       <NoConnectionBanner />
-      {user ? <AppTabs /> : <AuthStack />}
+      {user && isRecovery ? <ResetPasswordScreen /> : user ? <AppTabs /> : <AuthStack />}
     </View>
   );
 }

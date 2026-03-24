@@ -19,6 +19,7 @@ export const linking = {
         screens: {
           Login: 'login',
           SignUp: 'signup',
+          ResetPassword: 'reset-password',
         },
       },
     },

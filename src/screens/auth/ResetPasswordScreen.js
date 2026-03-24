@@ -9,34 +9,39 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import * as Linking from 'expo-linking';
 import { useAuth } from '../../hooks/useAuth';
-import { colors, fonts, radii, spacing, typography } from '../../theme';
+import { colors, fonts, radii, spacing } from '../../theme';
 
-export function ForgotPasswordScreen({ navigation }) {
-  const { resetPassword } = useAuth();
-  const [email, setEmail] = useState('');
+export function ResetPasswordScreen() {
+  const { updatePassword } = useAuth();
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleReset = async () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email address.');
+  const handleUpdate = async () => {
+    if (!password || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all fields.');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match.');
       return;
     }
 
     setLoading(true);
-    const redirectTo = Linking.createURL('reset-password');
-    const { error } = await resetPassword(email.trim(), { redirectTo });
+    const { error } = await updatePassword(password);
     setLoading(false);
 
     if (error) {
       Alert.alert('Error', error.message);
     } else {
-      Alert.alert(
-        'Check Your Email',
-        'If an account exists with that email, you will receive a password reset link.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }],
-      );
+      Alert.alert('Success', 'Your password has been updated.');
     }
   };
 
@@ -46,34 +51,38 @@ export function ForgotPasswordScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.inner}>
-        <Text style={styles.title}>Reset Password</Text>
+        <Text style={styles.title}>New Password</Text>
         <Text style={styles.subtitle}>
-          Enter your email and we'll send you a reset link.
+          Enter your new password below.
         </Text>
 
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder="New Password"
           placeholderTextColor={colors.textTertiary}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          textContentType="emailAddress"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          textContentType="newPassword"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Confirm Password"
+          placeholderTextColor={colors.textTertiary}
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
+          textContentType="newPassword"
         />
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleReset}
+          onPress={handleUpdate}
           disabled={loading}
         >
           <Text style={styles.buttonText}>
-            {loading ? 'Sending...' : 'Send Reset Link'}
+            {loading ? 'Updating...' : 'Update Password'}
           </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.link}>Back to Log In</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -122,7 +131,6 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginTop: spacing.sm,
-    marginBottom: 20,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -131,11 +139,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: fonts.bodySemiBold,
     fontSize: 17,
-  },
-  link: {
-    textAlign: 'center',
-    fontFamily: fonts.bodySemiBold,
-    color: colors.cta,
-    fontSize: 14,
   },
 });
