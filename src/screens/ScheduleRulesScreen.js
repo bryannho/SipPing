@@ -149,7 +149,7 @@ export function ScheduleRulesScreen({ route, navigation }) {
     const directionText = isSender ? `→ ${otherName}` : `← ${otherName}`;
 
     return (
-      <View style={[styles.ruleCard, !item.active && styles.ruleCardInactive]}>
+      <View style={styles.ruleCard}>
         <View style={styles.ruleHeader}>
           <Text style={styles.ruleEmoji}>{emoji}</Text>
           <View style={styles.ruleInfo}>
@@ -162,6 +162,11 @@ export function ScheduleRulesScreen({ route, navigation }) {
             </Text>
             {item.timezone && (
               <Text style={styles.ruleTimezone}>{item.timezone}</Text>
+            )}
+            {item.sender_note && (
+              <Text style={styles.ruleNote} numberOfLines={1}>
+                "{item.sender_note}"
+              </Text>
             )}
           </View>
           <Switch
@@ -361,9 +366,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     ...shadows.card,
   },
-  ruleCardInactive: {
-    opacity: 0.5,
-  },
   ruleHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -389,6 +391,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textTertiary,
     marginTop: 1,
+  },
+  ruleNote: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   ruleActions: {
     flexDirection: 'row',

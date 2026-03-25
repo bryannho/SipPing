@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,15 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { sendDrinkPingNotification } from '../utils/pushNotifications';
 import { playSendSound } from '../utils/sounds';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 const SCHEDULE_OPTIONS = [
@@ -25,6 +28,7 @@ const SCHEDULE_OPTIONS = [
 
 export function SendScreen({ route, navigation }) {
   const { user } = useAuth();
+  const tabBarHeight = useBottomTabBarHeight();
   const [trips, setTrips] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [members, setMembers] = useState([]);
@@ -34,6 +38,16 @@ export function SendScreen({ route, navigation }) {
   const [scheduleDelay, setScheduleDelay] = useState(0);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   useEffect(() => {
     if (route.params?.tripId) setSelectedTripId(route.params.tripId);
@@ -190,8 +204,9 @@ export function SendScreen({ route, navigation }) {
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.scrollContent, keyboardHeight > 0 && { paddingBottom: keyboardHeight - tabBarHeight + spacing.md }]}
       keyboardShouldPersistTaps="handled"
     >
       {/* Screen title */}
@@ -325,6 +340,9 @@ export function SendScreen({ route, navigation }) {
           multiline
           blurOnSubmit={true}
           returnKeyType="done"
+          onFocus={() => {
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+          }}
         />
       </View>
 

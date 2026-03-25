@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
   Alert,
   ActivityIndicator,
   Modal,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
@@ -25,8 +29,19 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 export function CreateScheduleRuleScreen({ route, navigation }) {
   const { user } = useAuth();
+  const tabBarHeight = useBottomTabBarHeight();
   const { tripId, editRule } = route.params || {};
   const isEditing = !!editRule;
+  const scrollRef = useRef(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const [members, setMembers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState(
@@ -47,6 +62,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
       Intl.DateTimeFormat().resolvedOptions().timeZone ||
       'America/New_York'
   );
+  const [senderNote, setSenderNote] = useState(editRule?.sender_note || '');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showTimePicker, setShowTimePicker] = useState(null);
@@ -104,6 +120,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
           end_time: endTime,
           interval_minutes: intervalMinutes,
           timezone,
+          sender_note: senderNote.trim() || null,
         })
         .eq('id', editRule.id);
 
@@ -127,6 +144,7 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
         end_time: endTime,
         interval_minutes: intervalMinutes,
         timezone,
+        sender_note: senderNote.trim() || null,
       });
 
       setSaving(false);
@@ -152,8 +170,9 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.scrollContent, keyboardHeight > 0 && { paddingBottom: keyboardHeight - tabBarHeight + spacing.md }]}
       keyboardShouldPersistTaps="handled"
     >
       {/* Person selector */}
@@ -290,6 +309,25 @@ export function CreateScheduleRuleScreen({ route, navigation }) {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      {/* Optional message */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Message (optional)</Text>
+        <TextInput
+          style={styles.noteInput}
+          placeholder="Stay hydrated!"
+          placeholderTextColor={colors.textTertiary}
+          value={senderNote}
+          onChangeText={setSenderNote}
+          maxLength={200}
+          multiline
+          blurOnSubmit={true}
+          returnKeyType="done"
+          onFocus={() => {
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+          }}
+        />
       </View>
 
       {/* Summary */}
@@ -550,6 +588,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.cta,
     lineHeight: 20,
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    padding: 14,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    color: colors.navy,
+    backgroundColor: colors.card,
+    minHeight: 60,
+    textAlignVertical: 'top',
   },
   saveButton: {
     backgroundColor: colors.cta,

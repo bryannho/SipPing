@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
@@ -9,12 +10,15 @@ import {
   ScrollView,
   Alert,
   Animated,
+  Modal,
+  Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { pickAndUploadDrinkPhoto } from '../utils/imageUpload';
+import { pickAndUploadDrinkPhoto, pickAndUploadAvatar } from '../utils/imageUpload';
 import { playAcceptHaptic, playDeclineHaptic } from '../utils/sounds';
 import { PingAnimation } from '../components/PingAnimation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +26,7 @@ import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 export function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const [trips, setTrips] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [members, setMembers] = useState([]);
@@ -38,18 +42,64 @@ export function HomeScreen({ navigation }) {
   const [tripDropdownOpen, setTripDropdownOpen] = useState(false);
   const [profile, setProfile] = useState(null);
 
-  // Fetch user profile name
+  // Onboarding modal state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingName, setOnboardingName] = useState('');
+  const [onboardingAvatar, setOnboardingAvatar] = useState(null);
+  const [onboardingSaving, setOnboardingSaving] = useState(false);
+
+  // Fetch user profile name and check onboarding
   useEffect(() => {
     const fetchProfile = async () => {
       const { data } = await supabase
         .from('users')
-        .select('name')
+        .select('name, avatar_url')
         .eq('id', user.id)
         .single();
-      if (data) setProfile(data);
+      if (data) {
+        setProfile(data);
+
+        // Check if onboarding is needed (email signup only)
+        const isGoogleUser = user.app_metadata?.provider === 'google' ||
+          user.user_metadata?.avatar_url || user.user_metadata?.picture;
+        const storageKey = `onboarding_complete_${user.id}`;
+        const alreadyDone = await AsyncStorage.getItem(storageKey);
+
+        if (!alreadyDone && !isGoogleUser && !data.avatar_url) {
+          setOnboardingName(data.name || '');
+          setShowOnboarding(true);
+        }
+      }
     };
     fetchProfile();
   }, [user.id]);
+
+  const handleOnboardingSave = async () => {
+    const trimmed = onboardingName.trim();
+    if (!trimmed) {
+      Alert.alert('Error', 'Please enter a display name.');
+      return;
+    }
+    setOnboardingSaving(true);
+    await updateProfile({ name: trimmed });
+    setProfile((prev) => ({ ...prev, name: trimmed }));
+    await AsyncStorage.setItem(`onboarding_complete_${user.id}`, 'true');
+    setOnboardingSaving(false);
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingSkip = async () => {
+    await AsyncStorage.setItem(`onboarding_complete_${user.id}`, 'true');
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingAvatar = async () => {
+    const url = await pickAndUploadAvatar(user.id);
+    if (url) {
+      setOnboardingAvatar(url);
+      await updateProfile({ avatar_url: url });
+    }
+  };
 
   const fetchTrips = useCallback(async () => {
     const { data } = await supabase
@@ -372,10 +422,71 @@ export function HomeScreen({ navigation }) {
     return `Unsnoozes in ${mins}m`;
   };
 
+  // Onboarding modal — rendered as a standalone component so it shows
+  // regardless of loading/empty state
+  const onboardingModal = (
+    <Modal
+      visible={showOnboarding}
+      transparent
+      animationType="fade"
+      onRequestClose={handleOnboardingSkip}
+    >
+      <View style={styles.onboardingOverlay}>
+        <View style={styles.onboardingModal}>
+          <Text style={styles.onboardingTitle}>Welcome to SipPing!</Text>
+          <Text style={styles.onboardingSubtitle}>
+            Set up your profile so your friends know who you are
+          </Text>
+
+          <TouchableOpacity
+            style={styles.onboardingAvatarBtn}
+            onPress={handleOnboardingAvatar}
+          >
+            {onboardingAvatar ? (
+              <Image source={{ uri: onboardingAvatar }} style={styles.onboardingAvatarImage} />
+            ) : (
+              <View style={styles.onboardingAvatarPlaceholder}>
+                <Ionicons name="camera" size={28} color={colors.textTertiary} />
+              </View>
+            )}
+            <Text style={styles.onboardingAvatarLabel}>Add photo</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.onboardingFieldLabel}>Display Name</Text>
+          <TextInput
+            style={styles.onboardingInput}
+            value={onboardingName}
+            onChangeText={setOnboardingName}
+            placeholder="Your name"
+            placeholderTextColor={colors.textTertiary}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleOnboardingSave}
+          />
+
+          <TouchableOpacity
+            style={[styles.onboardingSaveBtn, onboardingSaving && { opacity: 0.6 }]}
+            onPress={handleOnboardingSave}
+            disabled={onboardingSaving}
+          >
+            <Text style={styles.onboardingSaveBtnText}>
+              {onboardingSaving ? 'Saving...' : 'Save'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleOnboardingSkip}>
+            <Text style={styles.onboardingSkip}>Skip for now</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
   if (loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={colors.cta} />
+        {onboardingModal}
       </View>
     );
   }
@@ -401,6 +512,7 @@ export function HomeScreen({ navigation }) {
         >
           <Text style={styles.secondaryButtonText}>Join with Code</Text>
         </TouchableOpacity>
+        {onboardingModal}
       </View>
     );
   }
@@ -689,6 +801,8 @@ export function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {onboardingModal}
     </View>
   );
 }
@@ -1143,5 +1257,96 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: fonts.bodySemiBold,
     fontSize: 16,
+  },
+  // Onboarding modal
+  onboardingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  onboardingModal: {
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+  },
+  onboardingTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 24,
+    color: colors.navy,
+    marginBottom: spacing.xs,
+  },
+  onboardingSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: 15,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  onboardingAvatarBtn: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  onboardingAvatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.bg,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  onboardingAvatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  onboardingAvatarLabel: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: colors.cta,
+    marginTop: spacing.sm,
+  },
+  onboardingFieldLabel: {
+    ...typography.label,
+    alignSelf: 'stretch',
+    marginBottom: spacing.sm,
+  },
+  onboardingInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    padding: 14,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    color: colors.navy,
+    backgroundColor: colors.bg,
+    width: '100%',
+    marginBottom: spacing.lg,
+  },
+  onboardingSaveBtn: {
+    backgroundColor: colors.cta,
+    borderRadius: radii.md,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  onboardingSaveBtnText: {
+    color: '#fff',
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 17,
+  },
+  onboardingSkip: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 });

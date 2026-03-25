@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
       .select(
         `
         id, trip_id, from_user_id, to_user_id, type,
-        start_time, end_time, interval_minutes, timezone, last_fired_at,
+        start_time, end_time, interval_minutes, timezone, last_fired_at, sender_note,
         trips!inner(status)
       `
       )
@@ -76,6 +76,7 @@ Deno.serve(async (req: Request) => {
             type: rule.type,
             status: "pending",
             scheduled_at: now.toISOString(),
+            sender_note: rule.sender_note || null,
           })
           .select("id")
           .single();
@@ -98,7 +99,8 @@ Deno.serve(async (req: Request) => {
           rule.type,
           rule.from_user_id,
           false,
-          newPing.id
+          newPing.id,
+          rule.sender_note || null
         );
 
         results.scheduled++;

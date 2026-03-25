@@ -213,7 +213,7 @@ export function TripDetailScreen({ route, navigation }) {
               trip?.status === 'active' && styles.statusActive,
             ]}
           >
-            {trip?.status === 'active' ? 'Active' : trip?.status || 'active'}
+            {trip?.status ? trip.status.charAt(0).toUpperCase() + trip.status.slice(1) : 'Active'}
           </Text>
           <Text style={styles.infoTileLabel}>Status</Text>
         </View>
