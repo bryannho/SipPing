@@ -196,9 +196,6 @@ export function SendScreen({ route, navigation }) {
     >
       {/* Screen title */}
       <Text style={styles.screenTitle}>Send a Ping</Text>
-      {selectedTrip && (
-        <Text style={styles.screenSubtitle}>{selectedTrip.name}</Text>
-      )}
 
       {/* Trip selector */}
       {trips.length > 1 && (
@@ -394,12 +391,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: colors.navy,
     marginBottom: spacing.xs,
-  },
-  screenSubtitle: {
-    fontFamily: fonts.body,
-    fontSize: 15,
-    color: colors.textSecondary,
-    marginBottom: spacing.md,
   },
   centered: {
     flex: 1,

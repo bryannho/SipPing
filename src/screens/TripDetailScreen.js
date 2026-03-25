@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   FlatList,
   StyleSheet,
   Alert,
   Share,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
@@ -20,6 +23,11 @@ export function TripDetailScreen({ route, navigation }) {
   const [members, setMembers] = useState([]);
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editEndDate, setEditEndDate] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchTripDetails();
@@ -80,6 +88,55 @@ export function TripDetailScreen({ route, navigation }) {
       ]
     );
   };
+
+  const isCreator = trip?.created_by === user.id;
+  const isActive = trip?.status === 'active';
+
+  const startEditing = () => {
+    setEditName(trip.name);
+    setEditEndDate(trip.end_date ? new Date(trip.end_date + 'T00:00:00') : null);
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+    setShowDatePicker(false);
+  };
+
+  const handleSaveEdit = async () => {
+    const trimmed = editName.trim();
+    if (!trimmed) {
+      Alert.alert('Error', 'Trip name cannot be empty.');
+      return;
+    }
+
+    setSaving(true);
+    const updateData = { name: trimmed };
+    updateData.end_date = editEndDate
+      ? editEndDate.toISOString().split('T')[0]
+      : null;
+
+    const { error } = await supabase
+      .from('trips')
+      .update(updateData)
+      .eq('id', tripId);
+
+    setSaving(false);
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+
+    setTrip((prev) => ({ ...prev, ...updateData }));
+    setEditing(false);
+    setShowDatePicker(false);
+  };
+
+  const formatDate = (date) =>
+    date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
 
   const renderMember = ({ item }) => (
     <View style={styles.memberRow}>
@@ -162,6 +219,72 @@ export function TripDetailScreen({ route, navigation }) {
         </View>
       </View>
 
+      {!editing && isCreator && isActive && (
+        <TouchableOpacity style={styles.editButton} onPress={startEditing}>
+          <Ionicons name="pencil" size={16} color={colors.cta} />
+          <Text style={styles.editButtonText}>Edit</Text>
+        </TouchableOpacity>
+      )}
+
+      {editing ? (
+        <View style={styles.editSection}>
+          <Text style={styles.fieldLabel}>Trip Name</Text>
+          <TextInput
+            style={styles.editInput}
+            value={editName}
+            onChangeText={setEditName}
+            maxLength={50}
+            autoFocus
+          />
+
+          <Text style={styles.fieldLabel}>End Date (optional)</Text>
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />
+            <Text style={editEndDate ? styles.dateText : styles.datePlaceholder}>
+              {editEndDate ? formatDate(editEndDate) : 'No end date'}
+            </Text>
+            {editEndDate && (
+              <TouchableOpacity
+                onPress={() => setEditEndDate(null)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={editEndDate || tomorrow}
+              mode="date"
+              minimumDate={tomorrow}
+              onChange={(event, selected) => {
+                setShowDatePicker(Platform.OS === 'ios');
+                if (selected) setEditEndDate(selected);
+              }}
+            />
+          )}
+
+          <View style={styles.editActions}>
+            <TouchableOpacity style={styles.cancelButton} onPress={cancelEditing}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.saveButton, saving && styles.buttonDisabled]}
+              onPress={handleSaveEdit}
+              disabled={saving}
+            >
+              <Text style={styles.saveButtonText}>
+                {saving ? 'Saving...' : 'Save'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
       <Text style={styles.sectionTitle}>
         Members ({members.length})
       </Text>
@@ -172,7 +295,7 @@ export function TripDetailScreen({ route, navigation }) {
         style={styles.membersList}
       />
 
-      {trip?.created_by === user.id && trip?.status === 'active' && (
+      {isCreator && isActive && !editing && (
         <TouchableOpacity style={styles.endButton} onPress={handleEndTrip}>
           <Text style={styles.endButtonText}>End Trip</Text>
         </TouchableOpacity>
@@ -323,6 +446,100 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
     overflow: 'hidden',
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: radii.md,
+    backgroundColor: 'rgba(255, 107, 107, 0.08)',
+    marginBottom: spacing.lg,
+  },
+  editButtonText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.cta,
+  },
+  editSection: {
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    ...shadows.card,
+  },
+  fieldLabel: {
+    ...typography.label,
+    marginBottom: spacing.sm,
+  },
+  editInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    padding: 14,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    color: colors.navy,
+    backgroundColor: colors.bg,
+    marginBottom: spacing.md,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    padding: 14,
+    backgroundColor: colors.bg,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  dateText: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    color: colors.navy,
+  },
+  datePlaceholder: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    color: colors.textTertiary,
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  cancelButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    padding: 14,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: colors.cta,
+    borderRadius: radii.md,
+    padding: 14,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 16,
   },
   endButton: {
     borderWidth: 1,
