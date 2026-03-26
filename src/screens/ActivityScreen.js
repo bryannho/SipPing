@@ -378,58 +378,76 @@ export function ActivityScreen({ navigation }) {
               </Text>
             </View>
           ) : (
-            <View style={styles.memberStatsRow}>
-              {stats.map((member, index) => (
-                <React.Fragment key={member.id}>
-                  {index > 0 && <View style={styles.memberDivider} />}
-                  <View
-                    style={[
-                      styles.memberStatCard,
-                      member.isCurrentUser && styles.memberStatCardSelf,
-                    ]}
-                  >
-                    <View style={styles.memberStatAvatar}>
-                      <Text style={styles.memberStatInitial}>
-                        {(member.name || '?')[0].toUpperCase()}
+            <>
+              <View style={styles.memberStatsRow}>
+                {stats.slice(0, 3).map((member, index) => (
+                  <React.Fragment key={member.id}>
+                    {index > 0 && <View style={styles.memberDivider} />}
+                    <View
+                      style={[
+                        styles.memberStatCard,
+                        member.isCurrentUser && styles.memberStatCardSelf,
+                      ]}
+                    >
+                      <View style={styles.memberStatAvatar}>
+                        <Text style={styles.memberStatInitial}>
+                          {(member.name || '?')[0].toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={styles.memberStatName} numberOfLines={1}>
+                        {member.isCurrentUser ? 'You' : member.name}
                       </Text>
-                    </View>
-                    <Text style={styles.memberStatName} numberOfLines={1}>
-                      {member.isCurrentUser ? 'You' : member.name}
-                    </Text>
 
-                    <View style={styles.memberStatGrid}>
-                      <View style={styles.miniStatRow}>
-                        <Text style={styles.miniStatWaterValue}>
-                          {'\uD83D\uDCA7'} {member.waterCount}
-                        </Text>
-                      </View>
-                      <View style={styles.miniStatRow}>
-                        <Text style={styles.miniStatShotValue}>
-                          {'\uD83E\uDD43'} {member.shotCount}
-                        </Text>
-                      </View>
+                      <View style={styles.memberStatGrid}>
+                        <View style={styles.miniStatRow}>
+                          <Text style={styles.miniStatWaterValue}>
+                            {'\uD83D\uDCA7'} {member.waterCount}
+                          </Text>
+                        </View>
+                        <View style={styles.miniStatRow}>
+                          <Text style={styles.miniStatShotValue}>
+                            {'\uD83E\uDD43'} {member.shotCount}
+                          </Text>
+                        </View>
 
-                      <View style={styles.memberStatDivider} />
+                        <View style={styles.memberStatDivider} />
 
-                      <View style={styles.miniStat}>
-                        <Text style={styles.miniStatValue}>
-                          {member.acceptanceRate !== null
-                            ? `${member.acceptanceRate}%`
-                            : '\u2014'}
-                        </Text>
-                        <Text style={styles.miniStatLabel}>Accept</Text>
-                      </View>
-                      <View style={styles.miniStat}>
-                        <Text style={styles.miniStatValue}>
-                          {member.streak > 0 ? `\uD83D\uDD25 ${member.streak}` : '\u2014'}
-                        </Text>
-                        <Text style={styles.miniStatLabel}>Streak</Text>
+                        <View style={styles.miniStat}>
+                          <Text style={styles.miniStatValue}>
+                            {member.acceptanceRate !== null
+                              ? `${member.acceptanceRate}%`
+                              : '\u2014'}
+                          </Text>
+                          <Text style={styles.miniStatLabel}>Accept</Text>
+                        </View>
+                        <View style={styles.miniStat}>
+                          <Text style={styles.miniStatValue}>
+                            {member.streak > 0 ? `\uD83D\uDD25 ${member.streak}` : '\u2014'}
+                          </Text>
+                          <Text style={styles.miniStatLabel}>Streak</Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                </React.Fragment>
-              ))}
-            </View>
+                  </React.Fragment>
+                ))}
+              </View>
+              {stats.length > 3 && (
+                <TouchableOpacity
+                  style={styles.seeAllMembersButton}
+                  onPress={() =>
+                    navigation.navigate('AllMemberStats', {
+                      stats,
+                      tripName: selectedTrip?.name,
+                    })
+                  }
+                >
+                  <Text style={styles.seeAllMembersText}>
+                    See all {stats.length} members
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.cta} />
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </View>
       </ViewShot>
@@ -755,6 +773,21 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  seeAllMembersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: spacing.sm,
+  },
+  seeAllMembersText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.cta,
+    marginRight: spacing.xs,
   },
   // Drink log section
   logSection: {
