@@ -59,7 +59,7 @@ export function DrinkLogScreen({ route }) {
 
     const { data } = await supabase
       .from('drink_log')
-      .select('*, user:users!drink_log_user_id_fkey(name, email)')
+      .select('*, user:users!drink_log_user_id_fkey(name, email), ping:drink_pings!drink_log_ping_id_fkey(sender_note, from_user:users!drink_pings_from_user_id_fkey(name, email))')
       .eq('trip_id', tripId)
       .order('logged_at', { ascending: false });
 
@@ -150,6 +150,8 @@ export function DrinkLogScreen({ route }) {
     const emoji = item.type === 'shot' ? '🥃' : '💧';
     const userName = item.user?.name || item.user?.email || 'Unknown';
     const isCurrentUser = item.user_id === user.id;
+    const senderName = item.ping?.from_user?.name || item.ping?.from_user?.email;
+    const senderNote = item.ping?.sender_note;
     const timeStr = new Date(item.logged_at).toLocaleTimeString([], {
       hour: 'numeric',
       minute: '2-digit',
@@ -163,8 +165,13 @@ export function DrinkLogScreen({ route }) {
           <Text style={styles.logEmoji}>{emoji}</Text>
           <View style={styles.logInfo}>
             <Text style={styles.logUser}>
-              {isCurrentUser ? 'You' : userName}
+              {senderName
+                ? `${senderName === user.name ? 'You' : senderName} → ${isCurrentUser ? 'You' : userName}`
+                : isCurrentUser ? 'You' : userName}
             </Text>
+            {senderNote ? (
+              <Text style={styles.logNote} numberOfLines={1}>"{senderNote}"</Text>
+            ) : null}
             <Text style={styles.logTime}>{timeStr}</Text>
           </View>
           <View
@@ -491,6 +498,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 15,
     color: colors.navy,
+  },
+  logNote: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 1,
   },
   logTime: {
     ...typography.caption,

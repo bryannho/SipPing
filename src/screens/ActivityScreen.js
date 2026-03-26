@@ -129,7 +129,7 @@ export function ActivityScreen({ navigation }) {
 
       const { data } = await supabase
         .from('drink_log')
-        .select('*, user:users!drink_log_user_id_fkey(name, email)')
+        .select('*, user:users!drink_log_user_id_fkey(name, email), ping:drink_pings!drink_log_ping_id_fkey(sender_note, from_user:users!drink_pings_from_user_id_fkey(name, email))')
         .eq('trip_id', tripId)
         .order('logged_at', { ascending: false })
         .limit(15);
@@ -477,6 +477,8 @@ export function ActivityScreen({ navigation }) {
             const emoji = log.type === 'water' ? '\uD83D\uDCA7' : '\uD83E\uDD43';
             const userName = log.user?.name || log.user?.email || 'Unknown';
             const isCurrentUser = log.user_id === user.id;
+            const senderName = log.ping?.from_user?.name || log.ping?.from_user?.email;
+            const senderNote = log.ping?.sender_note;
             const hasPhoto = log.image_url && signedUrls[log.image_url];
 
             return (
@@ -485,8 +487,13 @@ export function ActivityScreen({ navigation }) {
                   <Text style={styles.logEmoji}>{emoji}</Text>
                   <View style={styles.logInfo}>
                     <Text style={styles.logUser}>
-                      {isCurrentUser ? 'You' : userName}
+                      {senderName
+                        ? `${senderName === user.name ? 'You' : senderName} → ${isCurrentUser ? 'You' : userName}`
+                        : isCurrentUser ? 'You' : userName}
                     </Text>
+                    {senderNote ? (
+                      <Text style={styles.logNote} numberOfLines={1}>"{senderNote}"</Text>
+                    ) : null}
                     <Text style={styles.logTime}>
                       {formatLogTime(log.logged_at)}
                     </Text>
@@ -837,6 +844,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 15,
     color: colors.navy,
+  },
+  logNote: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 1,
   },
   logTime: {
     ...typography.caption,
